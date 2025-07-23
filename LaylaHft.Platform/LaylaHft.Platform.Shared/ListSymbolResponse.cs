@@ -4,6 +4,10 @@ namespace LaylaHft.Platform.Shared;
 
 public class ListSymbolResponse
 {
+    public bool Success { get; set; } = true;
+
+    public string? Message { get; set; } = null;
+
     /// <summary>
     /// gets or sets the exchange to filter symbols by.
     /// </summary>

@@ -18,6 +18,12 @@ namespace LaylaHft.Platform.MarketData
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
 
+            builder.Services.AddBinance();
+            builder.Services.AddSingleton<Services.ISymbolStore, Services.SymbolStore>();
+            builder.Services.AddSingleton<Services.SymbolDownloader>();
+            
+            builder.Services.AddHostedService<SymbolDownloaderBackgroundService>();
+
             var app = builder.Build();
 
             app.MapDefaultEndpoints();
