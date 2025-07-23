@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>192d01e6-f616-42b7-8e0c-4214db9e1f0b</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FastEndpoints" Version="7.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.7" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.22.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LaylaHft.Platform.Domains\LaylaHft.Platform.Domains.csproj" />
+    <ProjectReference Include="..\LaylaHft.Platform.ServiceDefaults\LaylaHft.Platform.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\LaylaHft.Platform.Shared\LaylaHft.Platform.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

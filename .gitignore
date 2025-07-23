@@ -1,0 +1,16 @@
+﻿################################################################################
+# Ce fichier .gitignore a été automatiquement créé par Microsoft(R) Visual Studio.
+################################################################################
+
+/LaylaHft.Platform/.vs
+/LaylaHft.Platform/LaylaHft.Platform.AppHost/bin/Debug/net9.0
+/LaylaHft.Platform/LaylaHft.Platform.AppHost/obj
+/LaylaHft.Platform/LaylaHft.Platform.Domains/bin/Debug/net9.0
+/LaylaHft.Platform/LaylaHft.Platform.Domains/obj/Debug/net9.0
+/LaylaHft.Platform/LaylaHft.Platform.Domains/obj
+/LaylaHft.Platform/LaylaHft.Platform.MarketData/bin/Debug/net9.0
+/LaylaHft.Platform/LaylaHft.Platform.MarketData/obj
+/LaylaHft.Platform/LaylaHft.Platform.ServiceDefaults/bin/Debug/net9.0
+/LaylaHft.Platform/LaylaHft.Platform.ServiceDefaults/obj
+/LaylaHft.Platform/LaylaHft.Platform.Shared/bin/Debug/net9.0
+/LaylaHft.Platform/LaylaHft.Platform.Shared/obj

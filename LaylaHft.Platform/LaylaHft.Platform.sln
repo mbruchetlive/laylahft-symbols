@@ -1,0 +1,48 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36109.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaylaHft.Platform.AppHost", "LaylaHft.Platform.AppHost\LaylaHft.Platform.AppHost.csproj", "{395B4125-EECC-4ED4-850E-642307066CF0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaylaHft.Platform.ServiceDefaults", "LaylaHft.Platform.ServiceDefaults\LaylaHft.Platform.ServiceDefaults.csproj", "{AF6E3D5B-DA27-C40A-A49E-B654C1C1A7C6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaylaHft.Platform.MarketData", "LaylaHft.Platform.MarketData\LaylaHft.Platform.MarketData.csproj", "{5BE06B8E-7EF8-4980-9F4C-C0E1EB8231DF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaylaHft.Platform.Shared", "LaylaHft.Platform.Shared\LaylaHft.Platform.Shared.csproj", "{FF5F783D-35F2-4E47-AA00-1224EDF8E782}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaylaHft.Platform.Domains", "LaylaHft.Platform.Domains\LaylaHft.Platform.Domains.csproj", "{13984D7E-D7B6-4FB8-9801-C164BCA8DDBC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{395B4125-EECC-4ED4-850E-642307066CF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{395B4125-EECC-4ED4-850E-642307066CF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{395B4125-EECC-4ED4-850E-642307066CF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{395B4125-EECC-4ED4-850E-642307066CF0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AF6E3D5B-DA27-C40A-A49E-B654C1C1A7C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF6E3D5B-DA27-C40A-A49E-B654C1C1A7C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF6E3D5B-DA27-C40A-A49E-B654C1C1A7C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF6E3D5B-DA27-C40A-A49E-B654C1C1A7C6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5BE06B8E-7EF8-4980-9F4C-C0E1EB8231DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5BE06B8E-7EF8-4980-9F4C-C0E1EB8231DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5BE06B8E-7EF8-4980-9F4C-C0E1EB8231DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5BE06B8E-7EF8-4980-9F4C-C0E1EB8231DF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF5F783D-35F2-4E47-AA00-1224EDF8E782}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF5F783D-35F2-4E47-AA00-1224EDF8E782}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF5F783D-35F2-4E47-AA00-1224EDF8E782}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF5F783D-35F2-4E47-AA00-1224EDF8E782}.Release|Any CPU.Build.0 = Release|Any CPU
+		{13984D7E-D7B6-4FB8-9801-C164BCA8DDBC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{13984D7E-D7B6-4FB8-9801-C164BCA8DDBC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{13984D7E-D7B6-4FB8-9801-C164BCA8DDBC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{13984D7E-D7B6-4FB8-9801-C164BCA8DDBC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F109DA8A-87FA-44F2-A50A-58C0258B11F9}
+	EndGlobalSection
+EndGlobal
