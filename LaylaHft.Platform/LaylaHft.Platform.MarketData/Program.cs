@@ -1,5 +1,6 @@
 
 using FastEndpoints;
+using FastEndpoints.Security;
 
 namespace LaylaHft.Platform.MarketData
 {
@@ -10,7 +11,20 @@ namespace LaylaHft.Platform.MarketData
             var builder = WebApplication.CreateBuilder(args);
             builder.AddServiceDefaults();
 
-            builder.Services.AddFastEndpoints();
+            var jwtKey = builder.Configuration["Jwt:SigningKey"];
+
+            ArgumentException.ThrowIfNullOrEmpty(jwtKey, "Jwt:Signing is null");
+
+            builder.Services
+                .AddAuthenticationJwtBearer(s =>
+                {
+                    s.SigningKey = jwtKey;
+                }, options =>
+                {
+                    options.RequireHttpsMetadata = false;
+                }) //add this
+               .AddAuthorization()
+               .AddFastEndpoints();
 
             // Add services to the container.
 
@@ -21,7 +35,8 @@ namespace LaylaHft.Platform.MarketData
             builder.Services.AddBinance();
             builder.Services.AddSingleton<Services.ISymbolStore, Services.SymbolStore>();
             builder.Services.AddSingleton<Services.SymbolDownloader>();
-            
+            builder.Services.AddSingleton<IMyAuthService, MyAuthService>();
+
             builder.Services.AddHostedService<SymbolDownloaderBackgroundService>();
 
             var app = builder.Build();
@@ -41,7 +56,10 @@ namespace LaylaHft.Platform.MarketData
 
             app.MapControllers();
 
-            app.UseFastEndpoints();
+            app.UseAuthentication()
+               .UseAuthorization()
+               .UseFastEndpoints();
+
             app.Run();
         }
     }

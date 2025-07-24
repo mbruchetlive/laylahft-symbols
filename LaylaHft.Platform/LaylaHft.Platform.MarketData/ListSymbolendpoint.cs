@@ -2,6 +2,7 @@
 using LaylaHft.Platform.Domains;
 using LaylaHft.Platform.MarketData.Services;
 using LaylaHft.Platform.Shared;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LaylaHft.Platform.AppHost;
@@ -12,15 +13,16 @@ public class ListSymbolendpoint : Endpoint<ListSymbolsQuery, ListSymbolResponse>
     public override void Configure()
     {
         Post("/api/symbols/query");
-        AllowAnonymous();
-    }
+        Scopes("symbols:read");
+        AuthSchemes(JwtBearerDefaults.AuthenticationScheme);
+        }
 
     public override async Task HandleAsync(ListSymbolsQuery req, CancellationToken ct)
     {
         if (symbolDownloader.IsLoading)
-            await Send.OkAsync(new ListSymbolResponse { Success = false, Message = "pending" });
+            await Send.OkAsync(new ListSymbolResponse { Success = false, Message = "pending" }, ct);
         else if (await symbolDownloader.TotalCount() < 1)
-            await Send.OkAsync(new ListSymbolResponse { Success = false, Message = "no symbols" });
+            await Send.OkAsync(new ListSymbolResponse { Success = false, Message = "no symbols" }, ct);
         else
         {
             var symbols = await symbolDownloader.GetSymbols(req.Exchange, req.QuoteClass, req.Currency, req.IncludeInactive, req.Page, req.PageSize, req.SortBy);

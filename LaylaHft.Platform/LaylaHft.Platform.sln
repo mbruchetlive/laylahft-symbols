@@ -12,6 +12,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaylaHft.Platform.Shared", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaylaHft.Platform.Domains", "LaylaHft.Platform.Domains\LaylaHft.Platform.Domains.csproj", "{13984D7E-D7B6-4FB8-9801-C164BCA8DDBC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaylaHft.Platform.Client", "LaylaHft.Platform.Client\LaylaHft.Platform.Client.csproj", "{82C6AA36-1CCB-4418-893B-0895DBBD0B0F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaylaHft.Platform.Tests", "LaylaHft.Platform.Tests\LaylaHft.Platform.Tests.csproj", "{3FA33319-1778-4D13-A884-2A2F55C625B8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -38,6 +42,14 @@ Global
 		{13984D7E-D7B6-4FB8-9801-C164BCA8DDBC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{13984D7E-D7B6-4FB8-9801-C164BCA8DDBC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{13984D7E-D7B6-4FB8-9801-C164BCA8DDBC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{82C6AA36-1CCB-4418-893B-0895DBBD0B0F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{82C6AA36-1CCB-4418-893B-0895DBBD0B0F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{82C6AA36-1CCB-4418-893B-0895DBBD0B0F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{82C6AA36-1CCB-4418-893B-0895DBBD0B0F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3FA33319-1778-4D13-A884-2A2F55C625B8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3FA33319-1778-4D13-A884-2A2F55C625B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3FA33319-1778-4D13-A884-2A2F55C625B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3FA33319-1778-4D13-A884-2A2F55C625B8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
