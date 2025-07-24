@@ -110,6 +110,8 @@ public class SymbolDownloader
                 importedCount++;
             }
 
+            await _store.SaveToFileAsync();
+
             stopwatch.Stop();
             _logger.LogInformation("[Symbols] Loaded {Count} symbols from Binance in {Elapsed} ms.", importedCount, stopwatch.Elapsed.TotalMilliseconds);
         }
