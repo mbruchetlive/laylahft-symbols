@@ -28,7 +28,17 @@ Critères d’acceptation :
 - Chaque symbole est bien mappé et stocké
 - L’événement de fin de chargement est émis
 - Les erreurs sont tracées proprement
-*/
+* */
+
+/*
+ * US 5 : Récupération en mode failback
+ * En tant que DataAggregator, je veux lire les symboles depuis un cache local en cas d’échec, afin de continuer à servir des données aux services même sans accès réseau.
+* */
+
+/*
+ * US 6 : Surveillance de la connectivité
+ * En tant que opérateur, je veux voir dans les logs si le système fonctionne en mode failback, afin de réagir rapidement en cas de problème réseau/API.
+ * */
 
 using Binance.Net.Clients;
 using Binance.Net.Interfaces.Clients;
@@ -44,6 +54,41 @@ public class SymbolDownloader
 
     private volatile bool _isLoading = false;
     public bool IsLoading => _isLoading;
+    private Timer? _reconnectTimer;
+    private bool _isInFallback;
+
+    public bool IsOnline { get; private set; }
+
+    public void StartConnectivityMonitor()
+    {
+        if (_reconnectTimer != null) return; // Évite les doublons
+
+        _reconnectTimer = new Timer(async _ =>
+        {
+            if (_isLoading) return;
+
+            try
+            {
+                var result = await _client.SpotApi.ExchangeData.GetExchangeInfoAsync();
+                if (result.Success && result.Data != null)
+                {
+                    _logger.LogInformation("[Symbols] Binance is back online. Exiting FAILBACK MODE. Reloading symbols...");
+                    _reconnectTimer?.Dispose();
+                    _reconnectTimer = null;
+                    _isInFallback = false;
+                    await LoadInitialSymbolsAsync();
+                }
+            }
+            catch(Exception ex)
+            {
+                _logger.LogError(ex, "[Symbols] Failed to load from Binance. Entering FAILBACK MODE.");
+                _isInFallback = true;
+            }
+        },
+        null,
+        TimeSpan.FromSeconds(10),    // Première tentative rapide
+        TimeSpan.FromMinutes(1));    // Ensuite toutes les minutes
+    }
 
     public SymbolDownloader(
         IBinanceRestClient client,
@@ -114,11 +159,15 @@ public class SymbolDownloader
 
             stopwatch.Stop();
             _logger.LogInformation("[Symbols] Loaded {Count} symbols from Binance in {Elapsed} ms.", importedCount, stopwatch.Elapsed.TotalMilliseconds);
+
+            IsOnline = true;
         }
         catch (Exception ex)
         {
+            _isInFallback = true;
             _logger.LogError(ex, "[Symbols] Failed to load from Binance.");
-            throw;
+            IsOnline = false;
+            StartConnectivityMonitor();
         }
         finally
         {
