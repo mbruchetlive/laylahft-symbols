@@ -40,10 +40,15 @@ Critères d’acceptation :
  * En tant que opérateur, je veux voir dans les logs si le système fonctionne en mode failback, afin de réagir rapidement en cas de problème réseau/API.
  * */
 
+/*
+ * US 8 : Notification d'événements de mise à jour, 
+ * En tant que module dépendant (API, WebSocket, moteur), je veux être notifié lorsqu’un symbole est ajouté ou mis à jour, afin de réagir en temps réel aux changements de données. je pense qu'il faut qu'on crée un signal-r hub et l'invoquer depuis le service downloader. 
+* */
 using Binance.Net.Clients;
 using Binance.Net.Interfaces.Clients;
 using Binance.Net.Objects.Models.Spot;
 using LaylaHft.Platform.Domains;
+using Microsoft.AspNetCore.SignalR;
 using System.Diagnostics;
 
 public class SymbolDownloader
@@ -51,6 +56,7 @@ public class SymbolDownloader
     private readonly IBinanceRestClient _client;
     private readonly ISymbolStore _store;
     private readonly ILogger<SymbolDownloader> _logger;
+    private readonly IHubContext<SymbolHub> _hubContext;
 
     private volatile bool _isLoading = false;
     public bool IsLoading => _isLoading;
@@ -93,11 +99,13 @@ public class SymbolDownloader
     public SymbolDownloader(
         IBinanceRestClient client,
         ISymbolStore store,
+        IHubContext<SymbolHub> hubContext,
         ILogger<SymbolDownloader> logger)
     {
         _client = client;
         _store = store;
         _logger = logger;
+        _hubContext = hubContext;
     }
 
     public async Task LoadInitialSymbolsAsync()
@@ -152,6 +160,9 @@ public class SymbolDownloader
                 };
 
                 await _store.Upsert(metadata.Exchange, metadata.QuoteAsset, metadata.Symbol, metadata);
+
+                await _hubContext.Clients.All.SendAsync("SymbolUpdated", metadata);
+
                 importedCount++;
             }
 

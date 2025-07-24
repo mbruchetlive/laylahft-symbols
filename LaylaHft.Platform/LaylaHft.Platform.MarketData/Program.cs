@@ -57,6 +57,8 @@ builder.Services.SwaggerDocument(o =>
     };
 });
 
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
@@ -71,5 +73,6 @@ app.UseAuthentication()
    .UseFastEndpoints()
    .UseSwaggerGen();
 
+app.MapHub<SymbolHub>("/hubs/symbols");
 
 app.Run();
