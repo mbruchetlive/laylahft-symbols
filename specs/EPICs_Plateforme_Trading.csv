@@ -1,0 +1,20 @@
+EPIC,User Story
+MarketContextAPI,Collecter les bougies via Binance.Net WebSocket
+MarketContextAPI,Analyser les patterns et calculer les scores comportementaux
+MarketContextAPI,Générer des signaux et exposer un endpoint /symbols/contexts
+TradeEngineAPI,Exécuter les ordres via Binance.Net (market/limit)
+TradeEngineAPI,"Gérer le SL dynamique, drawdown et capital max"
+TradeEngineAPI,Exposer /trades/execute et /trades/active
+ClientAPI,Authentifier l’utilisateur avec JWT et sécuriser les routes
+ClientAPI,"Gérer les clés API, dépôts de frais et paramètres bots"
+ClientAPI,Exposer un endpoint interne pour la balance client
+ClientUI,Afficher les symboles analysés avec scoring
+ClientUI,Visualiser les signaux et positions ouvertes
+ClientUI,"Suivre l’historique des trades, frais et performances"
+AdminUI,Lister les clients et bots actifs/inactifs
+AdminUI,"Afficher les statistiques globales (volume, PnL)"
+AdminUI,Consulter les logs d’activité des bots
+BacktestRunner,Charger un historique local et simuler les signaux
+BacktestRunner,"Générer un rapport avec winrate, drawdown et PnL"
+Orchestration des Flux,Relier signal → exécution de trade
+Orchestration des Flux,Surveiller la cohérence des modules et erreurs critiques

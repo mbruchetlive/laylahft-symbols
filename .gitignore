@@ -14,3 +14,7 @@
 /LaylaHft.Platform/LaylaHft.Platform.ServiceDefaults/obj
 /LaylaHft.Platform/LaylaHft.Platform.Shared/bin/Debug/net9.0
 /LaylaHft.Platform/LaylaHft.Platform.Shared/obj
+/LaylaHft.Platform/LaylaHft.Platform.Client/obj
+/LaylaHft.Platform/LaylaHft.Platform.Client/bin/Debug/net9.0
+/LaylaHft.Platform/LaylaHft.Platform.Tests/bin/Debug/net9.0
+/LaylaHft.Platform/LaylaHft.Platform.Tests/obj
