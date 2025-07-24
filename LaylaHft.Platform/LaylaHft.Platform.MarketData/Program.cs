@@ -22,7 +22,6 @@ builder.Services
     }) //add this
    .AddAuthorization()
    .AddFastEndpoints()
-   .AddResponseCaching()
    .SwaggerDocument();
 
 // Add services to the container.
@@ -69,7 +68,6 @@ app.UseAuthorization();
 
 app.UseAuthentication()
    .UseAuthorization()
-   .UseResponseCaching()
    .UseFastEndpoints()
    .UseSwaggerGen();
 

@@ -64,6 +64,7 @@ public class SymbolDownloader
     private bool _isInFallback;
 
     public bool IsOnline { get; private set; }
+    public DateTime LastDownloadDate { get; private set; }
 
     public void StartConnectivityMonitor()
     {
@@ -172,6 +173,7 @@ public class SymbolDownloader
             _logger.LogInformation("[Symbols] Loaded {Count} symbols from Binance in {Elapsed} ms.", importedCount, stopwatch.Elapsed.TotalMilliseconds);
 
             IsOnline = true;
+            LastDownloadDate = DateTime.Now;
         }
         catch (Exception ex)
         {

@@ -1,11 +1,8 @@
-﻿using CryptoExchange.Net.Interfaces;
-using CryptoExchange.Net.Requests;
-using FastEndpoints;
+﻿using FastEndpoints;
 using LaylaHft.Platform.Domains;
 using LaylaHft.Platform.MarketData.Services;
 using LaylaHft.Platform.Shared;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Mvc;
 
 namespace LaylaHft.Platform.AppHost;
 
@@ -18,8 +15,6 @@ public class ListSymbolEndpoint : Endpoint<ListSymbolsQuery, ListSymbolResponse>
 
         Scopes("symbols:read");
         AuthSchemes(JwtBearerDefaults.AuthenticationScheme);
-
-        ResponseCache(1800);
 
         Throttle(
             hitLimit: 120,
@@ -61,6 +56,7 @@ public class ListSymbolEndpoint : Endpoint<ListSymbolsQuery, ListSymbolResponse>
                 PageSize = 20,
                 SortBy = "symbol",
                 TotalCount = 2,
+                LastDownloadDate = DateTime.Now,
                 Symbols = new List<SymbolMetadata>
         {
             new SymbolMetadata { Symbol = "BTCUSDC", Status = SymbolStatus.Active },
@@ -94,7 +90,8 @@ public class ListSymbolEndpoint : Endpoint<ListSymbolsQuery, ListSymbolResponse>
                 QuoteClass = req.QuoteClass,
                 SortBy = req.SortBy,
                 TotalCount = symbols.Item1,
-                Symbols = symbols.Item2
+                Symbols = symbols.Item2,
+                LastDownloadDate = symbolDownloader.LastDownloadDate
             }, ct);
         }
     }
