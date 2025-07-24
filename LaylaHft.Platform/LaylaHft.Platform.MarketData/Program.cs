@@ -1,66 +1,75 @@
-
 using FastEndpoints;
 using FastEndpoints.Security;
+using FastEndpoints.Swagger;
+using LaylaHft.Platform.MarketData;
+using LaylaHft.Platform.MarketData.Services;
+using System.Diagnostics.Metrics;
 
-namespace LaylaHft.Platform.MarketData
-{
-    public class Program
+var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
+
+var jwtKey = builder.Configuration["Jwt:SigningKey"];
+
+ArgumentException.ThrowIfNullOrEmpty(jwtKey, "Jwt:Signing is null");
+
+builder.Services
+    .AddAuthenticationJwtBearer(s =>
     {
-        public static void Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
-            builder.AddServiceDefaults();
+        s.SigningKey = jwtKey;
+    }, options =>
+    {
+        options.RequireHttpsMetadata = false;
+    }) //add this
+   .AddAuthorization()
+   .AddFastEndpoints()
+   .AddResponseCaching()
+   .SwaggerDocument();
 
-            var jwtKey = builder.Configuration["Jwt:SigningKey"];
+// Add services to the container.
 
-            ArgumentException.ThrowIfNullOrEmpty(jwtKey, "Jwt:Signing is null");
+builder.Services.AddControllers();
+// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddOpenApi();
 
-            builder.Services
-                .AddAuthenticationJwtBearer(s =>
-                {
-                    s.SigningKey = jwtKey;
-                }, options =>
-                {
-                    options.RequireHttpsMetadata = false;
-                }) //add this
-               .AddAuthorization()
-               .AddFastEndpoints();
+builder.Services.AddBinance();
 
-            // Add services to the container.
+builder.Services.AddSingleton<ISymbolStore>(sp =>
+{
+    var env = sp.GetRequiredService<IWebHostEnvironment>();
+    var logger = sp.GetRequiredService<ILogger<SymbolStore>>();
+    var meters = sp.GetRequiredService<IMeterFactory>();
+    var path = Path.Combine(env.ContentRootPath, "Data", "symbols.bin");
+    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+    return new SymbolStore(path, logger, meters);
+});
 
-            builder.Services.AddControllers();
-            // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-            builder.Services.AddOpenApi();
+builder.Services.AddSingleton<SymbolDownloader>();
+builder.Services.AddSingleton<IMyAuthService, MyAuthService>();
 
-            builder.Services.AddBinance();
-            builder.Services.AddSingleton<Services.ISymbolStore, Services.SymbolStore>();
-            builder.Services.AddSingleton<Services.SymbolDownloader>();
-            builder.Services.AddSingleton<IMyAuthService, MyAuthService>();
+builder.Services.AddHostedService<SymbolDownloaderBackgroundService>();
 
-            builder.Services.AddHostedService<SymbolDownloaderBackgroundService>();
+builder.Services.SwaggerDocument(o =>
+{
+    o.DocumentSettings = s =>
+    {
+        s.Title = "Layla HFT - Symbols api";
+        s.Version = "v1";
+    };
+});
 
-            var app = builder.Build();
+var app = builder.Build();
 
-            app.MapDefaultEndpoints();
+app.MapDefaultEndpoints();
 
-            // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
-            {
-                app.MapOpenApi();
-            }
+app.UseHttpsRedirection();
 
-            app.UseHttpsRedirection();
+app.UseAuthorization();
 
-            app.UseAuthorization();
+app.UseAuthentication()
+   .UseAuthorization()
+   .UseResponseCaching()
+   .UseFastEndpoints()
+   .UseSwaggerGen();
 
 
-            app.MapControllers();
-
-            app.UseAuthentication()
-               .UseAuthorization()
-               .UseFastEndpoints();
-
-            app.Run();
-        }
-    }
-}
+app.Run();
