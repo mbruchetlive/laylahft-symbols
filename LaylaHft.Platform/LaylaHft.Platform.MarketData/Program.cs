@@ -22,13 +22,14 @@ builder.Services
     }) //add this
    .AddAuthorization()
    .AddFastEndpoints()
-   .SwaggerDocument();
-
-// Add services to the container.
-
-builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+   .SwaggerDocument(o =>
+    {
+        o.DocumentSettings = s =>
+        {
+            s.Title = "Layla HFT - Symbols api";
+            s.Version = "v1";
+        };
+    });
 
 builder.Services.AddBinance();
 
@@ -47,24 +48,9 @@ builder.Services.AddSingleton<IMyAuthService, MyAuthService>();
 
 builder.Services.AddHostedService<SymbolDownloaderBackgroundService>();
 
-builder.Services.SwaggerDocument(o =>
-{
-    o.DocumentSettings = s =>
-    {
-        s.Title = "Layla HFT - Symbols api";
-        s.Version = "v1";
-    };
-});
-
 builder.Services.AddSignalR();
 
 var app = builder.Build();
-
-app.MapDefaultEndpoints();
-
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
 
 app.UseAuthentication()
    .UseAuthorization()
