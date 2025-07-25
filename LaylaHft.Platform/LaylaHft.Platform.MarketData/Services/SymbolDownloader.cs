@@ -47,7 +47,9 @@ Critères d’acceptation :
 using Binance.Net.Clients;
 using Binance.Net.Interfaces.Clients;
 using Binance.Net.Objects.Models.Spot;
+using FastEndpoints;
 using LaylaHft.Platform.Domains;
+using LaylaHft.Platform.MarketData.Events;
 using Microsoft.AspNetCore.SignalR;
 using System.Diagnostics;
 
@@ -56,7 +58,6 @@ public class SymbolDownloader
     private readonly IBinanceRestClient _client;
     private readonly ISymbolStore _store;
     private readonly ILogger<SymbolDownloader> _logger;
-    private readonly IHubContext<SymbolHub> _hubContext;
 
     private volatile bool _isLoading = false;
     public bool IsLoading => _isLoading;
@@ -100,13 +101,11 @@ public class SymbolDownloader
     public SymbolDownloader(
         IBinanceRestClient client,
         ISymbolStore store,
-        IHubContext<SymbolHub> hubContext,
         ILogger<SymbolDownloader> logger)
     {
         _client = client;
         _store = store;
         _logger = logger;
-        _hubContext = hubContext;
     }
 
     public async Task LoadInitialSymbolsAsync()
@@ -162,7 +161,12 @@ public class SymbolDownloader
 
                 await _store.Upsert(metadata.Exchange, metadata.QuoteAsset, metadata.Symbol, metadata);
 
-                await _hubContext.Clients.All.SendAsync("SymbolUpdated", metadata);
+                await new SymbolImportedEvent
+                {
+                    Symbol = metadata.Symbol,
+                    Exchange = metadata.Exchange,
+                    QuoteAsset = metadata.QuoteAsset
+                }.PublishAsync(Mode.WaitForNone);
 
                 importedCount++;
             }

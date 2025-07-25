@@ -45,8 +45,11 @@ builder.Services.AddSingleton<ISymbolStore>(sp =>
 
 builder.Services.AddSingleton<SymbolDownloader>();
 builder.Services.AddSingleton<IMyAuthService, MyAuthService>();
+builder.Services.AddSingleton<ISymbolMarketStatsCalculator, SymbolMarketStatsCalculator>();
+builder.Services.AddSingleton<ISymbolStatsQueue, InMemorySymbolStatsQueue>();
 
 builder.Services.AddHostedService<SymbolDownloaderBackgroundService>();
+builder.Services.AddHostedService<SymbolStatsProcessorService>();
 
 builder.Services.AddSignalR();
 

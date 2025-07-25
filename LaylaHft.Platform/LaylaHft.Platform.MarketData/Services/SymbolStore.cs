@@ -173,4 +173,10 @@ public class SymbolStore : ISymbolStore, IDisposable
         _flushTimer?.Dispose();
         FlushIfNeededAsync().GetAwaiter().GetResult();
     }
+
+    public Task<SymbolMetadata?> GetAsync(string exchange, string quoteClass, string symbol)
+    {
+        var key = $"{exchange?.ToLowerInvariant()}|{quoteClass?.ToLowerInvariant()}|{symbol.ToLowerInvariant()}";
+        return Task.FromResult(_symbols.TryGetValue(key, out var metadata) ? metadata : null);
+    }
 }
