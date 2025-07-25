@@ -2,6 +2,7 @@ using FastEndpoints;
 using FastEndpoints.Security;
 using FastEndpoints.Swagger;
 using LaylaHft.Platform.MarketData;
+using LaylaHft.Platform.MarketData.BackgroundServices;
 using LaylaHft.Platform.MarketData.Services;
 using System.Diagnostics.Metrics;
 

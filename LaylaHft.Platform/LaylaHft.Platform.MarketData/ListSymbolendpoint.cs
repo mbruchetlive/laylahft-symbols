@@ -4,7 +4,7 @@ using LaylaHft.Platform.MarketData.Services;
 using LaylaHft.Platform.Shared;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
-namespace LaylaHft.Platform.AppHost;
+namespace LaylaHft.Platform.MarketData;
 
 public class ListSymbolEndpoint : Endpoint<ListSymbolsQuery, ListSymbolResponse>
 {

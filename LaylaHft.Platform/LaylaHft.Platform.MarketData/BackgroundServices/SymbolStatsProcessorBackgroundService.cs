@@ -1,6 +1,6 @@
 ﻿using LaylaHft.Platform.MarketData.Services;
 
-namespace LaylaHft.Platform.MarketData;
+namespace LaylaHft.Platform.MarketData.BackgroundServices;
 
 public class SymbolStatsProcessorService : BackgroundService
 {

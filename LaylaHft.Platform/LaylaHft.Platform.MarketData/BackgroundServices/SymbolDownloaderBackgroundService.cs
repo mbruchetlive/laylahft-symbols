@@ -1,4 +1,4 @@
-﻿namespace LaylaHft.Platform.MarketData;
+﻿namespace LaylaHft.Platform.MarketData.BackgroundServices;
 
 // SymbolBackgroundService.cs
 
