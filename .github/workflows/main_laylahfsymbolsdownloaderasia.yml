@@ -66,5 +66,5 @@ jobs:
         with:
           app-name: 'laylahfsymbolsdownloaderasia'
           slot-name: 'Production'
-          package: .
+          package: ./layla
           
