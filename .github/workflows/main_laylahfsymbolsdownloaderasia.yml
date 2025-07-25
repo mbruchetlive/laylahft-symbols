@@ -38,4 +38,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: .net-app
-          path: ./layla
+          path: ./LaylaHft.Platform/layla
