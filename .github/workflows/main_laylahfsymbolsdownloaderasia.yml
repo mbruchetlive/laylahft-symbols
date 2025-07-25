@@ -1,4 +1,7 @@
-name: Build laylahft - symbols service .NET App Only
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
+name: Build LAYLA HFT - SYMBOL SERVICE ASP.Net Core app to Azure Web App - laylahfsymbolsdownloaderasia
 
 on:
   push:
@@ -31,11 +34,37 @@ jobs:
       - name: dotnet publish
         run: dotnet publish LaylaHft.Platform.MarketData/LaylaHft.Platform.MarketData.csproj -c Release -o ./layla
 
-      - name: Debug build output
-        run: ls -la ./layla
-
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
-          name: dotnet-app
-          path: ./layla
+          name: .net-app
+          path: layla
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_B6BA4BF896F34FEDA3911E8085AD67C9 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_CE4375E4041F4A28852BECF9E5BE20F6 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_293D7B8ED4D24FA797C26708A2475104 }}
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'laylahfsymbolsdownloaderasia'
+          slot-name: 'Production'
+          package: .
