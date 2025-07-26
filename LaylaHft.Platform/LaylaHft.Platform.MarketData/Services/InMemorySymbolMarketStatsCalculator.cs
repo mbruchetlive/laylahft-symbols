@@ -9,12 +9,12 @@ using System.Threading;
 
 namespace LaylaHft.Platform.MarketData.Services;
 
-public class SymbolMarketStatsCalculator : ISymbolMarketStatsCalculator
+public class InMemorySymbolMarketStatsCalculator : ISymbolMarketStatsCalculator
 {
     private readonly IBinanceRestClient _client;
     private readonly ISymbolStore _store;
     private readonly IHubContext<SymbolHub> _hub;
-    private readonly ILogger<SymbolMarketStatsCalculator> _logger;
+    private readonly ILogger<InMemorySymbolMarketStatsCalculator> _logger;
 
     private static readonly Meter _meter;
     private static readonly Counter<int> _successCounter;
@@ -22,7 +22,7 @@ public class SymbolMarketStatsCalculator : ISymbolMarketStatsCalculator
     private static readonly Histogram<double> _durationHistogram;
     private static readonly ActivitySource _activitySource;
 
-    static SymbolMarketStatsCalculator()
+    static InMemorySymbolMarketStatsCalculator()
     {
         // Register the ActivitySource for telemetry
         Activity.DefaultIdFormat = ActivityIdFormat.W3C;
@@ -36,11 +36,11 @@ public class SymbolMarketStatsCalculator : ISymbolMarketStatsCalculator
         _durationHistogram = _meter.CreateHistogram<double>("stats.calculation.duration.ms", unit: "ms", description: "Temps de calcul des stats marché");
     }
 
-    public SymbolMarketStatsCalculator(
+    public InMemorySymbolMarketStatsCalculator(
         IBinanceRestClient client,
         ISymbolStore store,
         IHubContext<SymbolHub> hub,
-        ILogger<SymbolMarketStatsCalculator> logger)
+        ILogger<InMemorySymbolMarketStatsCalculator> logger)
     {
         _client = client;
         _store = store;

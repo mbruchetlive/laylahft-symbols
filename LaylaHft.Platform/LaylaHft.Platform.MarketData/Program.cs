@@ -40,19 +40,21 @@ builder.Services.AddBinance();
 builder.Services.AddSingleton<ISymbolStore>(sp =>
 {
     var env = sp.GetRequiredService<IWebHostEnvironment>();
-    var logger = sp.GetRequiredService<ILogger<SymbolStore>>();
+    var logger = sp.GetRequiredService<ILogger<InMemorySymbolStore>>();
     var path = Path.Combine(env.ContentRootPath, "Data", "symbols.bin");
     Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-    return new SymbolStore(path, logger);
+    return new InMemorySymbolStore(path, logger);
 });
 
 builder.Services.AddSingleton<SymbolDownloader>();
 builder.Services.AddSingleton<IMyAuthService, MyAuthService>();
-builder.Services.AddSingleton<ISymbolMarketStatsCalculator, SymbolMarketStatsCalculator>();
+builder.Services.AddSingleton<ISymbolMarketStatsCalculator, InMemorySymbolMarketStatsCalculator>();
 builder.Services.AddSingleton<ISymbolStatsQueue, InMemorySymbolStatsQueue>();
+builder.Services.AddSingleton<ICandleBufferRegistry, InMemoryCandleBufferRegistry>();
 
 builder.Services.AddHostedService<SymbolDownloaderBackgroundService>();
 builder.Services.AddHostedService<SymbolStatsProcessorService>();
+builder.Services.AddHostedService<MarketDataCollectorWorker>();
 
 builder.Services.AddSignalR();
 

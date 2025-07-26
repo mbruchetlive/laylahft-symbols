@@ -38,7 +38,7 @@ public class MarketDataCollectorWorkerUnitTests
     public MarketDataCollectorWorkerUnitTests()
     {
         var meterProvider = Sdk.CreateMeterProviderBuilder()
-            .AddMeter("LaylaHft.SymbolStore")
+            .AddMeter("LaylaHft.InMemorySymbolStore")
             .AddMeter("LaylaHft.MarketStats")
             .AddMeter("LaylaHft.MarketDataCollectorWorker")
             .AddConsoleExporter()

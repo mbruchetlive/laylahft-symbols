@@ -7,12 +7,12 @@ using System.Text.Json;
 
 namespace LaylaHft.Platform.MarketData.Services;
 
-public class SymbolStore : ISymbolStore, IDisposable
+public class InMemorySymbolStore : ISymbolStore, IDisposable
 {
     private readonly ConcurrentDictionary<string, SymbolMetadata> _symbols = new();
     private readonly string _storagePath;
     private readonly SemaphoreSlim _fileLock = new(1, 1);
-    private readonly ILogger<SymbolStore> _logger;
+    private readonly ILogger<InMemorySymbolStore> _logger;
 
     private static readonly Counter<int> _symbolUpsertCounter;
     private static readonly Counter<int> _symbolQueryCounter;
@@ -24,14 +24,14 @@ public class SymbolStore : ISymbolStore, IDisposable
     private volatile bool _hasPendingChanges = false;
     private readonly TimeSpan _flushInterval = TimeSpan.FromMinutes(5);
 
-    static SymbolStore()
+    static InMemorySymbolStore()
     {
         // Register the ActivitySource for telemetry
         Activity.DefaultIdFormat = ActivityIdFormat.W3C;
         Activity.ForceDefaultIdFormat = true;
 
-        var meter = new Meter("LaylaHft.SymbolStore");
-        _activitySource = new ActivitySource("LaylaHft.SymbolStore");
+        var meter = new Meter("LaylaHft.InMemorySymbolStore");
+        _activitySource = new ActivitySource("LaylaHft.InMemorySymbolStore");
         
         _symbolUpsertCounter = meter.CreateCounter<int>("symbols.upsert.count", description: "Total number of symbol upserts");
         _symbolQueryCounter = meter.CreateCounter<int>("symbols.query.count", description: "Total number of symbol queries");
@@ -39,7 +39,7 @@ public class SymbolStore : ISymbolStore, IDisposable
 
     }
 
-    public SymbolStore(string storagePath, ILogger<SymbolStore> logger)
+    public InMemorySymbolStore(string storagePath, ILogger<InMemorySymbolStore> logger)
     {
         _storagePath = storagePath;
         _logger = logger;
@@ -109,7 +109,7 @@ public class SymbolStore : ISymbolStore, IDisposable
 
     public async Task Upsert(string? exchange, string? quoteClass, string symbol, SymbolMetadata metadata)
     {
-        using var activity = _activitySource.StartActivity("SymbolStore.Upsert");
+        using var activity = _activitySource.StartActivity("InMemorySymbolStore.Upsert");
 
         var key = $"{exchange?.ToLowerInvariant()}|{quoteClass?.ToLowerInvariant()}|{symbol.ToLowerInvariant()}";
         _symbols[key] = metadata;
@@ -122,7 +122,7 @@ public class SymbolStore : ISymbolStore, IDisposable
 
     public Task<int> Count(string? exchange, string? quoteClass, bool includeInactive)
     {
-        using var activity = _activitySource.StartActivity("SymbolStore.Count");
+        using var activity = _activitySource.StartActivity("InMemorySymbolStore.Count");
 
         var query = _symbols.Values.AsEnumerable();
 
@@ -143,7 +143,7 @@ public class SymbolStore : ISymbolStore, IDisposable
 
     public Task<List<SymbolMetadata>> Query(string? exchange, string? quoteClass, bool includeInactive, int page, int pageSize, string? sortBy)
     {
-        using var activity = _activitySource.StartActivity("SymbolStore.Query");
+        using var activity = _activitySource.StartActivity("InMemorySymbolStore.Query");
         var sw = Stopwatch.StartNew();
 
         var query = _symbols.Values.AsEnumerable();

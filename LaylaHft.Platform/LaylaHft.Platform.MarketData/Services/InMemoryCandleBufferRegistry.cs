@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 
 namespace LaylaHft.Platform.MarketData.Services;
 
-public class CandleBufferRegistry : ICandleBufferRegistry
+public class InMemoryCandleBufferRegistry : ICandleBufferRegistry
 {
     private readonly ConcurrentDictionary<(string Symbol, KlineInterval Interval), CircularBuffer<CandleSnapshot>> _buffers = new();
 

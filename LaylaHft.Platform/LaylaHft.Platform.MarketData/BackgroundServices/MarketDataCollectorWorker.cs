@@ -16,14 +16,14 @@ namespace LaylaHft.Platform.MarketData.BackgroundServices;
  * En tant que système, je veux démarrer un service de fond qui initialise les timeframes et les symboles.
 
 Récupération des timeframes depuis la config
-Récupération de la liste des symboles via SymbolStore
+Récupération de la liste des symboles via InMemorySymbolStore
 Construction de l’URL WS Binance
 Initialisation des buffers FIFO
 Démarrage de la session WebSocket
 
 Résumé de l’intention :
 lit la configuration (Timeframes, etc.),
-récupère les symboles via SymbolStore,
+récupère les symboles via InMemorySymbolStore,
 génère dynamiquement l’URL WebSocket Binance,
 initialise les buffers,
 et lance la session WebSocket.
@@ -121,7 +121,7 @@ public class MarketDataCollectorWorker : BackgroundService
         using var activity = ActivitySource.StartActivity("LoadSymbols");
         try
         {
-            _logger.LogInformation("Chargement des symboles actifs depuis le SymbolStore...");
+            _logger.LogInformation("Chargement des symboles actifs depuis le InMemorySymbolStore...");
             Symbols = await _symbolStore.Query(
                 exchange: "binance",
                 quoteClass: null,
