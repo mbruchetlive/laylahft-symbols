@@ -226,31 +226,46 @@ public class MarketDataCollectorWorker : BackgroundService
         var sw = Stopwatch.StartNew();
         using var activity = ActivitySource.StartActivity("HandleCandleUpdate");
 
-        var kline = data.Data;
-        var snapshot = new CandleSnapshot(
-            openTime: kline.OpenTime,
-            closeTime: kline.CloseTime,
-            open: kline.OpenPrice,
-            high: kline.HighPrice,
-            low: kline.LowPrice,
-            close: kline.ClosePrice,
-            volume: kline.Volume,
-            symbol: data.Symbol,
-            interval: kline.Interval.ToString().ToUpperInvariant()
-        );
+        if(data == null || data.Data == null)
+        {
+            _logger.LogWarning("Données de bougie nulles ou vides reçues.");
+            return;
+        }
 
-        _bufferRegistry.Append(data.Symbol, kline.Interval, snapshot);
-        _klineMessageCounter.Add(1);
-        sw.Stop();
-        _latencyHistogram.Record(sw.Elapsed.TotalMilliseconds);
+        if (!data.Data.Final)
+        {
+            _logger.LogDebug("Mise à jour de bougie intermédiaire pour {Symbol} à {CloseTime}", data.Symbol, data.Data.CloseTime);
+        }
+        else
+        {
+            _logger.LogDebug("Bougie finale reçue pour {Symbol} à {CloseTime}", data.Symbol, data.Data.CloseTime);
 
-        _logger.LogInformation("Kline reçu : {Symbol} | {Interval} | Close: {Close} | TS: {TS}",
-            data.Symbol,
-            kline.Interval,
-            kline.ClosePrice,
-            kline.CloseTime);
+            var kline = data.Data;
+            var snapshot = new CandleSnapshot(
+                openTime: kline.OpenTime,
+                closeTime: kline.CloseTime,
+                open: kline.OpenPrice,
+                high: kline.HighPrice,
+                low: kline.LowPrice,
+                close: kline.ClosePrice,
+                volume: kline.Volume,
+                symbol: data.Symbol,
+                interval: kline.Interval.ToString().ToUpperInvariant()
+            );
 
-        _ = OnCandleMessageAsync(snapshot, CancellationToken.None);
+            _bufferRegistry.Append(data.Symbol, kline.Interval, snapshot);
+            _klineMessageCounter.Add(1);
+            sw.Stop();
+            _latencyHistogram.Record(sw.Elapsed.TotalMilliseconds);
+
+            _logger.LogInformation("Kline reçu : {Symbol} | {Interval} | Close: {Close} | TS: {TS}",
+                data.Symbol,
+                kline.Interval,
+                kline.ClosePrice,
+                kline.CloseTime);
+
+            _ = OnCandleMessageAsync(snapshot, CancellationToken.None);
+        }
     }
 
     private async Task OnCandleMessageAsync(CandleSnapshot data, CancellationToken cancellationToken)
