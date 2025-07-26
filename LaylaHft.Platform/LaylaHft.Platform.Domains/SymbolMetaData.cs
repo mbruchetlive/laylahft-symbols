@@ -31,7 +31,7 @@ public class SymbolMetadata
 [MessagePackObject]
 public class SparklineData
 {
-    [Key(0)] public List<decimal> Data { get; set; } = new();
+    [Key(0)] public List<decimal> Data { get; set; } = [];
     [Key(1)] public string Color { get; set; }
 }
 

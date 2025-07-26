@@ -13,24 +13,37 @@ public class SymbolStore : ISymbolStore, IDisposable
     private readonly string _storagePath;
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly ILogger<SymbolStore> _logger;
-    private readonly Counter<int> _symbolUpsertCounter;
-    private readonly Counter<int> _symbolQueryCounter;
-    private readonly Histogram<double> _queryDurationHistogram;
-    private readonly ActivitySource _activitySource;
+
+    private static readonly Counter<int> _symbolUpsertCounter;
+    private static readonly Counter<int> _symbolQueryCounter;
+    private static readonly Histogram<double> _queryDurationHistogram;
+    private static readonly ActivitySource _activitySource;
+    
+    
     private readonly Timer _flushTimer;
     private volatile bool _hasPendingChanges = false;
     private readonly TimeSpan _flushInterval = TimeSpan.FromMinutes(5);
 
-    public SymbolStore(string storagePath, ILogger<SymbolStore> logger, IMeterFactory meterFactory)
+    static SymbolStore()
+    {
+        // Register the ActivitySource for telemetry
+        Activity.DefaultIdFormat = ActivityIdFormat.W3C;
+        Activity.ForceDefaultIdFormat = true;
+
+        var meter = new Meter("LaylaHft.SymbolStore");
+        _activitySource = new ActivitySource("LaylaHft.SymbolStore");
+        
+        _symbolUpsertCounter = meter.CreateCounter<int>("symbols.upsert.count", description: "Total number of symbol upserts");
+        _symbolQueryCounter = meter.CreateCounter<int>("symbols.query.count", description: "Total number of symbol queries");
+        _queryDurationHistogram = meter.CreateHistogram<double>("symbols.query.duration.ms", unit: "ms", description: "Duration of symbol queries");
+
+    }
+
+    public SymbolStore(string storagePath, ILogger<SymbolStore> logger)
     {
         _storagePath = storagePath;
         _logger = logger;
-        _activitySource = new ActivitySource("LaylaHft.SymbolStore");
 
-        var meter = meterFactory.Create("LaylaHft.SymbolStore");
-        _symbolUpsertCounter = meter.CreateCounter<int>("symbols.upsert.count", description: "Nombre total de mises à jour de symboles");
-        _symbolQueryCounter = meter.CreateCounter<int>("symbols.query.count", description: "Nombre total de requêtes symboles");
-        _queryDurationHistogram = meter.CreateHistogram<double>("symbols.query.duration.ms", unit: "ms", description: "Durée des requêtes symboles");
 
         LoadFromFile();
         _flushTimer = new Timer(_ => FlushIfNeededAsync().GetAwaiter().GetResult(), null, _flushInterval, _flushInterval);

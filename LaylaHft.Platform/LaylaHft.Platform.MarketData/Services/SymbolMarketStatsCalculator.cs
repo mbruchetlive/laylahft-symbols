@@ -5,6 +5,7 @@ using LaylaHft.Platform.Domains;
 using Microsoft.AspNetCore.SignalR;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Threading;
 
 namespace LaylaHft.Platform.MarketData.Services;
 
@@ -15,28 +16,36 @@ public class SymbolMarketStatsCalculator : ISymbolMarketStatsCalculator
     private readonly IHubContext<SymbolHub> _hub;
     private readonly ILogger<SymbolMarketStatsCalculator> _logger;
 
-    private readonly Counter<int> _successCounter;
-    private readonly Counter<int> _failureCounter;
-    private readonly Histogram<double> _durationHistogram;
-    private readonly ActivitySource _activitySource;
+    private static readonly Meter _meter;
+    private static readonly Counter<int> _successCounter;
+    private static readonly Counter<int> _failureCounter;
+    private static readonly Histogram<double> _durationHistogram;
+    private static readonly ActivitySource _activitySource;
+
+    static SymbolMarketStatsCalculator()
+    {
+        // Register the ActivitySource for telemetry
+        Activity.DefaultIdFormat = ActivityIdFormat.W3C;
+        Activity.ForceDefaultIdFormat = true;
+
+        _meter = new Meter("LaylaHft.MarketStats", "1.0");
+        _activitySource = new ActivitySource("LaylaHft.MarketStats");
+
+        _successCounter = _meter.CreateCounter<int>("stats.calculated.success.count", description: "Nombre de symboles calculés avec succès");
+        _failureCounter = _meter.CreateCounter<int>("stats.calculated.failure.count", description: "Nombre de symboles ayant échoué");
+        _durationHistogram = _meter.CreateHistogram<double>("stats.calculation.duration.ms", unit: "ms", description: "Temps de calcul des stats marché");
+    }
 
     public SymbolMarketStatsCalculator(
         IBinanceRestClient client,
         ISymbolStore store,
         IHubContext<SymbolHub> hub,
-        ILogger<SymbolMarketStatsCalculator> logger,
-        IMeterFactory meterFactory)
+        ILogger<SymbolMarketStatsCalculator> logger)
     {
         _client = client;
         _store = store;
         _hub = hub;
         _logger = logger;
-
-        var meter = meterFactory.Create("LaylaHft.MarketStats");
-        _successCounter = meter.CreateCounter<int>("stats.calculated.success.count", description: "Nombre de symboles calculés avec succès");
-        _failureCounter = meter.CreateCounter<int>("stats.calculated.failure.count", description: "Nombre de symboles ayant échoué");
-        _durationHistogram = meter.CreateHistogram<double>("stats.calculation.duration.ms", unit: "ms", description: "Temps de calcul des stats marché");
-        _activitySource = new ActivitySource("LaylaHft.MarketStats");
     }
 
     public async Task CalculateAsync(SymbolMetadata symbol)

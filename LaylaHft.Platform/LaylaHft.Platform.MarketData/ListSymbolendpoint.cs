@@ -57,11 +57,11 @@ public class ListSymbolEndpoint : Endpoint<ListSymbolsQuery, ListSymbolResponse>
                 SortBy = "symbol",
                 TotalCount = 2,
                 LastDownloadDate = DateTime.Now,
-                Symbols = new List<SymbolMetadata>
-        {
+                Symbols =
+        [
             new SymbolMetadata { Symbol = "BTCUSDC", Status = SymbolStatus.Active },
             new SymbolMetadata { Symbol = "ETHUSDC", Status = SymbolStatus.Active }
-        }
+        ]
             };
 
             s.Responses[200] = "Retourne la liste des symboles correspondant aux critères, paginée et triée.";

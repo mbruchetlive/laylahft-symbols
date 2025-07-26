@@ -61,11 +61,12 @@ public static class Extensions
                     .AddRuntimeInstrumentation()
                     .AddMeter("LaylaHft.SymbolStore")
                     .AddMeter("LaylaHft.MarketStats")
+                    .AddMeter("LaylaHft.MarketDataCollectorWorker")
                     ;
             })
             .WithTracing(tracing =>
             {
-                tracing.AddSource(builder.Environment.ApplicationName, "LaylaHft.SymbolStore", "LaylaHft.MarketStats")
+                tracing.AddSource(builder.Environment.ApplicationName, "LaylaHft.SymbolStore", "LaylaHft.MarketStats", "LaylaHft.MarketDataCollectorWorker")
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing
                         tracing.Filter = context =>

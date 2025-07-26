@@ -5,6 +5,9 @@ using LaylaHft.Platform.MarketData;
 using LaylaHft.Platform.MarketData.BackgroundServices;
 using LaylaHft.Platform.MarketData.Services;
 using System.Diagnostics.Metrics;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("LaylaHft.Platform.Tests")]
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
@@ -38,10 +41,9 @@ builder.Services.AddSingleton<ISymbolStore>(sp =>
 {
     var env = sp.GetRequiredService<IWebHostEnvironment>();
     var logger = sp.GetRequiredService<ILogger<SymbolStore>>();
-    var meters = sp.GetRequiredService<IMeterFactory>();
     var path = Path.Combine(env.ContentRootPath, "Data", "symbols.bin");
     Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-    return new SymbolStore(path, logger, meters);
+    return new SymbolStore(path, logger);
 });
 
 builder.Services.AddSingleton<SymbolDownloader>();
