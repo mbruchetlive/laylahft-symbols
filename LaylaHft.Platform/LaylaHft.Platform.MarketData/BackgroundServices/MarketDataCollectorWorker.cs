@@ -11,24 +11,6 @@ using System.Runtime.CompilerServices;
 
 namespace LaylaHft.Platform.MarketData.BackgroundServices;
 
-/*
- * us 01 : Initialisation du Worke
- * En tant que système, je veux démarrer un service de fond qui initialise les timeframes et les symboles.
-
-Récupération des timeframes depuis la config
-Récupération de la liste des symboles via InMemorySymbolStore
-Construction de l’URL WS Binance
-Initialisation des buffers FIFO
-Démarrage de la session WebSocket
-
-Résumé de l’intention :
-lit la configuration (Timeframes, etc.),
-récupère les symboles via InMemorySymbolStore,
-génère dynamiquement l’URL WebSocket Binance,
-initialise les buffers,
-et lance la session WebSocket.
-*/
-
 public class MarketDataCollectorWorker : BackgroundService
 {
     private readonly IConfiguration _configuration;
@@ -37,29 +19,18 @@ public class MarketDataCollectorWorker : BackgroundService
     private readonly IBinanceSocketClient _socketClient;
     private readonly ICandleBufferRegistry _bufferRegistry;
 
-    // Metrics
-    private static readonly Meter _meter;
-    private static readonly Counter<int> _errorCounter;
-    private static readonly Counter<int> _klineMessageCounter;
-    private static readonly Histogram<double> _latencyHistogram;
-    static MarketDataCollectorWorker()
-    {
-        // Initialize the Meter for metrics collection
-        _meter = new Meter("LaylaHft.MarketDataCollectorWorker", "1.0");
-
-        _errorCounter = _meter.CreateCounter<int>("layla_ws_errors");
-        _klineMessageCounter = _meter.CreateCounter<int>("layla_ws_kline_messages");
-        _latencyHistogram = _meter.CreateHistogram<double>("layla_ws_candle_latency", unit: "ms");
-    }
+    private static readonly Meter _meter = new("LaylaHft.MarketDataCollectorWorker", "1.0");
+    private static readonly Counter<int> _errorCounter = _meter.CreateCounter<int>("layla_ws_errors");
+    private static readonly Counter<int> _klineMessageCounter = _meter.CreateCounter<int>("layla_ws_kline_messages");
+    private static readonly Histogram<double> _latencyHistogram = _meter.CreateHistogram<double>("layla_ws_candle_latency", unit: "ms");
 
     private static readonly ActivitySource ActivitySource = new("LaylaHft.MarketDataCollectorWorker");
 
     private int _maxSymbols;
     private int _bufferWindow;
 
-
-    private List<SymbolMetadata> _symbols;
-    private List<string> _timeframes = [];
+    private List<SymbolMetadata> _symbols = new();
+    private List<string> _timeframes = new();
 
     internal List<SymbolMetadata> Symbols { get => _symbols; set => _symbols = value; }
     internal List<string> Timeframes { get => _timeframes; set => _timeframes = value; }
@@ -137,7 +108,6 @@ public class MarketDataCollectorWorker : BackgroundService
                 throw new InvalidOperationException("Aucun symbole actif trouvé.");
             }
 
-            Symbols = Symbols;
             _logger.LogInformation("{Count} symboles actifs chargés.", Symbols.Count);
         }
         catch (Exception ex)
@@ -166,6 +136,7 @@ public class MarketDataCollectorWorker : BackgroundService
     internal async Task InitializeWebSocketSubscriptionsAsync()
     {
         using var activity = ActivitySource.StartActivity("InitializeWebSocketSubscriptions");
+
         var intervals = Timeframes
             .Select(ConvertToKlineInterval)
             .Distinct()
@@ -173,28 +144,29 @@ public class MarketDataCollectorWorker : BackgroundService
 
         foreach (var chunk in Symbols.Select(s => s.Symbol).Chunk(100))
         {
-            var policy = Policy
-                .Handle<Exception>()
-                .WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)),
-                    (ex, delay, attempt, ctx) =>
-                    {
-                        _errorCounter.Add(1);
-                        _logger.LogWarning(ex, "Retry {Attempt}/3 après erreur de souscription : {Message}", attempt, ex.Message);
-                    });
-
-            await policy.ExecuteAsync(async () =>
+            foreach (var interval in intervals)
             {
-                var result = await _socketClient.SpotApi.ExchangeData
-                    .SubscribeToKlineUpdatesAsync(chunk, intervals, onMessage => HandleCandleUpdate(onMessage.Data));
+                _logger.LogInformation("Souscription aux mises à jour de bougies pour {Count} symboles avec intervalle {Interval}...", chunk.Count(), interval);
+                var policy = Policy
+                        .Handle<Exception>()
+                        .WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)),
+                            (ex, delay, attempt, ctx) =>
+                            {
+                                _errorCounter.Add(1);
+                                _logger.LogWarning(ex, "Retry {Attempt}/3 après erreur de souscription : {Message}", attempt, ex.Message);
+                            });
 
-                if (!result.Success)
+                await policy.ExecuteAsync(async () =>
                 {
-                    throw new InvalidOperationException($"Échec WS : {result.Error}");
-                }
+                    var result = await _socketClient.SpotApi.ExchangeData
+                        .SubscribeToKlineUpdatesAsync(chunk, [interval], onMessage => HandleCandleUpdate(onMessage.Data));
 
-                _logger.LogInformation("Souscription réussie pour {Count} symboles sur {CountIntervals} timeframes",
-                    chunk.Count(), intervals.Count);
-            });
+                    if (!result.Success)
+                        throw new InvalidOperationException($"Échec WS : {result.Error}");
+
+                    _logger.LogInformation("Souscription réussie pour {Count} symboles avec intervalle {interval}", chunk.Count(), interval);
+                });
+            }
         }
     }
 
@@ -226,7 +198,7 @@ public class MarketDataCollectorWorker : BackgroundService
         var sw = Stopwatch.StartNew();
         using var activity = ActivitySource.StartActivity("HandleCandleUpdate");
 
-        if(data == null || data.Data == null)
+        if (data == null || data.Data == null)
         {
             _logger.LogWarning("Données de bougie nulles ou vides reçues.");
             return;
@@ -272,6 +244,6 @@ public class MarketDataCollectorWorker : BackgroundService
     {
         using var activity = ActivitySource.StartActivity("OnCandleMessage");
         await Task.Yield();
-        _logger.LogDebug("Message reçu pour {Symbol} à {CloseTime}", data.Symbol, data.CloseTime);
+        _logger.LogInformation("Message reçu pour {Symbol} à {CloseTime}", data.Symbol, data.CloseTime);
     }
 }
