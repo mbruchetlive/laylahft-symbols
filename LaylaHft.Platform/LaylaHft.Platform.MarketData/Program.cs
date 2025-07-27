@@ -3,6 +3,7 @@ using FastEndpoints.Security;
 using FastEndpoints.Swagger;
 using LaylaHft.Platform.MarketData;
 using LaylaHft.Platform.MarketData.BackgroundServices;
+using LaylaHft.Platform.MarketData.Options;
 using LaylaHft.Platform.MarketData.Services;
 using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
@@ -37,6 +38,9 @@ builder.Services
 
 builder.Services.AddBinance();
 
+builder.Services.Configure<MarketDetectionSettings>(
+    builder.Configuration.GetSection("MarketDetection"));
+
 builder.Services.AddSingleton<ISymbolStore>(sp =>
 {
     var env = sp.GetRequiredService<IWebHostEnvironment>();
@@ -54,7 +58,7 @@ builder.Services.AddSingleton<ICandleBufferRegistry, InMemoryCandleBufferRegistr
 
 builder.Services.AddHostedService<SymbolDownloaderBackgroundService>();
 builder.Services.AddHostedService<SymbolStatsProcessorService>();
-builder.Services.AddHostedService<MarketDataCollectorWorker>();
+builder.Services.AddHostedService<MarketDataCollectorBackgroundService>();
 
 builder.Services.AddSignalR();
 

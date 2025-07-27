@@ -2,7 +2,9 @@
 using Binance.Net.Interfaces;
 using Binance.Net.Interfaces.Clients;
 using CryptoExchange.Net.Objects.Sockets;
+using FastEndpoints;
 using LaylaHft.Platform.Domains;
+using LaylaHft.Platform.MarketData.Events;
 using LaylaHft.Platform.MarketData.Services;
 using Polly;
 using System.Diagnostics;
@@ -11,10 +13,10 @@ using System.Runtime.CompilerServices;
 
 namespace LaylaHft.Platform.MarketData.BackgroundServices;
 
-public class MarketDataCollectorWorker : BackgroundService
+public class MarketDataCollectorBackgroundService : BackgroundService
 {
     private readonly IConfiguration _configuration;
-    private readonly ILogger<MarketDataCollectorWorker> _logger;
+    private readonly ILogger<MarketDataCollectorBackgroundService> _logger;
     private readonly ISymbolStore _symbolStore;
     private readonly IBinanceSocketClient _socketClient;
     private readonly ICandleBufferRegistry _bufferRegistry;
@@ -36,12 +38,12 @@ public class MarketDataCollectorWorker : BackgroundService
     internal List<string> Timeframes { get => _timeframes; set => _timeframes = value; }
     internal int BufferWindow { get => _bufferWindow; set => _bufferWindow = value; }
 
-    public MarketDataCollectorWorker(
+    public MarketDataCollectorBackgroundService(
         IConfiguration configuration,
         ISymbolStore symbolStore,
         IBinanceSocketClient socketClient,
         ICandleBufferRegistry bufferRegistry,
-        ILogger<MarketDataCollectorWorker> logger)
+        ILogger<MarketDataCollectorBackgroundService> logger)
     {
         _configuration = configuration;
         _logger = logger;
@@ -127,8 +129,7 @@ public class MarketDataCollectorWorker : BackgroundService
         {
             foreach (var tf in Timeframes)
             {
-                var interval = ConvertToKlineInterval(tf);
-                _bufferRegistry.InitializeBuffer(symbol.Symbol, interval, BufferWindow);
+                _bufferRegistry.InitializeBuffer(symbol.Symbol, tf, BufferWindow);
             }
         }
     }
@@ -225,7 +226,7 @@ public class MarketDataCollectorWorker : BackgroundService
                 interval: kline.Interval.ToString().ToUpperInvariant()
             );
 
-            _bufferRegistry.Append(data.Symbol, kline.Interval, snapshot);
+            _bufferRegistry.Append(data.Symbol, kline.Interval.ToString(), snapshot);
             _klineMessageCounter.Add(1);
             sw.Stop();
             _latencyHistogram.Record(sw.Elapsed.TotalMilliseconds);
@@ -243,7 +244,9 @@ public class MarketDataCollectorWorker : BackgroundService
     private async Task OnCandleMessageAsync(CandleSnapshot data, CancellationToken cancellationToken)
     {
         using var activity = ActivitySource.StartActivity("OnCandleMessage");
-        await Task.Yield();
-        _logger.LogInformation("Message reçu pour {Symbol} à {CloseTime}", data.Symbol, data.CloseTime);
+
+         await new CandleReceivedEvent { Snapshot = data }
+            .PublishAsync(Mode.WaitForNone, cancellation: cancellationToken);
+
     }
 }

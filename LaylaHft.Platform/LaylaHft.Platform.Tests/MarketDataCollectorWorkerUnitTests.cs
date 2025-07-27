@@ -33,7 +33,7 @@ public class MarketDataCollectorWorkerUnitTests
     private readonly Mock<ISymbolStore> _mockSymbolStore = new();
     private readonly Mock<IBinanceSocketClient> _mockSocketClient = new();
     private readonly Mock<ICandleBufferRegistry> _mockBufferRegistry = new();
-    private readonly Mock<ILogger<MarketDataCollectorWorker>> _mockLogger = new();
+    private readonly Mock<ILogger<MarketDataCollectorBackgroundService>> _mockLogger = new();
 
     public MarketDataCollectorWorkerUnitTests()
     {
@@ -49,7 +49,7 @@ public class MarketDataCollectorWorkerUnitTests
     public async Task ExecuteAsync_Throws_WhenTimeframesMissing()
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection().Build();
-        var worker = new MarketDataCollectorWorker(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object);
+        var worker = new MarketDataCollectorBackgroundService(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object);
         await Assert.ThrowsAsync<InvalidOperationException>(() => worker.StartAsync(CancellationToken.None));
     }
 
@@ -61,7 +61,7 @@ public class MarketDataCollectorWorkerUnitTests
         _mockSymbolStore.Setup(s => s.Query(It.IsAny<string>(), null, false, 1, It.IsAny<int>(), "symbol"))
                         .ReturnsAsync([]);
 
-        var worker = new MarketDataCollectorWorker(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object);
+        var worker = new MarketDataCollectorBackgroundService(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object);
         await Assert.ThrowsAsync<InvalidOperationException>(() => worker.StartAsync(CancellationToken.None));
     }
 
@@ -72,7 +72,7 @@ public class MarketDataCollectorWorkerUnitTests
         var config = new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
 
         var symbols = new List<SymbolMetadata> { new() { Symbol = "BTCUSDT" }, new() { Symbol = "ETHUSDT" } };
-        var worker = new MarketDataCollectorWorker(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object);
+        var worker = new MarketDataCollectorBackgroundService(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object);
 
         worker.Symbols = symbols;
         worker.Timeframes = ["M1"];
@@ -80,8 +80,8 @@ public class MarketDataCollectorWorkerUnitTests
 
         worker.InitializeBuffers();
 
-        _mockBufferRegistry.Verify(x => x.InitializeBuffer("BTCUSDT", KlineInterval.OneMinute, 5), Times.Once);
-        _mockBufferRegistry.Verify(x => x.InitializeBuffer("ETHUSDT", KlineInterval.OneMinute, 5), Times.Once);
+        _mockBufferRegistry.Verify(x => x.InitializeBuffer("BTCUSDT", "M1", 5), Times.Once);
+        _mockBufferRegistry.Verify(x => x.InitializeBuffer("ETHUSDT", "M1", 5), Times.Once);
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public class MarketDataCollectorWorkerUnitTests
         _mockSocketClient.Setup(c => c.SpotApi.ExchangeData.SubscribeToKlineUpdatesAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<IEnumerable<KlineInterval>>(),
             It.IsAny<Action<DataEvent<IBinanceStreamKlineData>>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CallResult<UpdateSubscription>(null, null, new ClientRateLimitError("client rate limit")));
 
-        var worker = new MarketDataCollectorWorker(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object);
+        var worker = new MarketDataCollectorBackgroundService(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object);
 
         worker.Symbols = symbols;
         worker.Timeframes = ["M1"];
@@ -114,7 +114,7 @@ public class MarketDataCollectorWorkerUnitTests
         _mockSocketClient.Setup(c => c.SpotApi.ExchangeData.SubscribeToKlineUpdatesAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<IEnumerable<KlineInterval>>(),
             It.IsAny<Action<DataEvent<IBinanceStreamKlineData>>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new CallResult<UpdateSubscription>(default(UpdateSubscription)));
 
-        var worker = new MarketDataCollectorWorker(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object)
+        var worker = new MarketDataCollectorBackgroundService(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object)
         {
             Symbols = symbols,
             Timeframes = ["M1"]
@@ -129,7 +129,7 @@ public class MarketDataCollectorWorkerUnitTests
     public void HandleCandleUpdate_AppendsBufferAndLogs()
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Timeframes:0"] = "M1" }).Build();
-        var worker = new MarketDataCollectorWorker(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object);
+        var worker = new MarketDataCollectorBackgroundService(config, _mockSymbolStore.Object, _mockSocketClient.Object, _mockBufferRegistry.Object, _mockLogger.Object);
 
         var stream = new BinanceStreamKlineData
         {
@@ -149,7 +149,7 @@ public class MarketDataCollectorWorkerUnitTests
 
         worker.HandleCandleUpdate(stream);
 
-        _mockBufferRegistry.Verify(x => x.Append("BTCUSDT", KlineInterval.OneMinute, It.IsAny<CandleSnapshot>()), Times.Once);
+        _mockBufferRegistry.Verify(x => x.Append("BTCUSDT", KlineInterval.OneMinute.ToString(), It.IsAny<CandleSnapshot>()), Times.Once);
         _mockLogger.Verify(x => x.Log(LogLevel.Information, It.IsAny<EventId>(), It.IsAny<It.IsAnyType>(), null, It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.AtLeastOnce);
     }
 }
