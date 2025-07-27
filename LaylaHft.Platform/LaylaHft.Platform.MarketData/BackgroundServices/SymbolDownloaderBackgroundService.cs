@@ -23,7 +23,7 @@ public class SymbolDownloaderBackgroundService : BackgroundService
         _logger.LogInformation("[SymbolDownloaderBackground] Initial load started...");
         try
         {
-            await _downloader.LoadInitialSymbolsAsync();
+            await _downloader.LoadInitialSymbolsAsync(cancellationToken);
             _logger.LogInformation("[SymbolDownloaderBackground] Initial load completed.");
         }
         catch (Exception ex)
@@ -33,21 +33,21 @@ public class SymbolDownloaderBackgroundService : BackgroundService
         await base.StartAsync(cancellationToken);
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        while (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogInformation("[SymbolDownloaderBackground] Scheduled refresh started...");
             try
             {
-                await _downloader.LoadInitialSymbolsAsync();
+                await _downloader.LoadInitialSymbolsAsync(cancellationToken);
                 _logger.LogInformation("[SymbolDownloaderBackground] Refresh completed.");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[SymbolDownloaderBackground] Refresh failed.");
             }
-            await Task.Delay(_refreshInterval, stoppingToken);
+            await Task.Delay(_refreshInterval, cancellationToken);
         }
     }
 }

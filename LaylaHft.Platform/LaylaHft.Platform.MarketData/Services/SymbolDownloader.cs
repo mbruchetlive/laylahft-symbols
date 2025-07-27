@@ -52,6 +52,7 @@ using LaylaHft.Platform.Domains;
 using LaylaHft.Platform.MarketData.Events;
 using Microsoft.AspNetCore.SignalR;
 using System.Diagnostics;
+using System.Threading;
 
 public class SymbolDownloader
 {
@@ -67,7 +68,7 @@ public class SymbolDownloader
     public bool IsOnline { get; private set; }
     public DateTime LastDownloadDate { get; private set; }
 
-    public void StartConnectivityMonitor()
+    public void StartConnectivityMonitor(CancellationToken cancellationToken)
     {
         if (_reconnectTimer != null) return; // Évite les doublons
 
@@ -84,7 +85,7 @@ public class SymbolDownloader
                     _reconnectTimer?.Dispose();
                     _reconnectTimer = null;
                     _isInFallback = false;
-                    await LoadInitialSymbolsAsync();
+                    await LoadInitialSymbolsAsync(cancellationToken);
                 }
             }
             catch(Exception ex)
@@ -108,7 +109,7 @@ public class SymbolDownloader
         _logger = logger;
     }
 
-    public async Task LoadInitialSymbolsAsync()
+    public async Task LoadInitialSymbolsAsync(CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
 
@@ -178,13 +179,16 @@ public class SymbolDownloader
 
             IsOnline = true;
             LastDownloadDate = DateTime.Now;
+
+            await new SymbolDownloadCompletedEvent()
+                .PublishAsync(Mode.WaitForNone, cancellationToken);
         }
         catch (Exception ex)
         {
             _isInFallback = true;
             _logger.LogError(ex, "[Symbols] Failed to load from Binance.");
             IsOnline = false;
-            StartConnectivityMonitor();
+            StartConnectivityMonitor(cancellationToken);
         }
         finally
         {
