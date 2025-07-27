@@ -51,6 +51,6 @@ public class ListSymbolResponse
     /// <summary>
     /// Gets or sets the list of symbols that match the query criteria.
     /// </summary>
-    public List<SymbolMetadata> Symbols { get; set; } = new List<SymbolMetadata>();
+    public List<SymbolMetadata> Symbols { get; set; } = [];
     public DateTime LastDownloadDate { get; set; }
 }
