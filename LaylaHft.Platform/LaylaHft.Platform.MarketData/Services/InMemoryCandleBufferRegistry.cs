@@ -6,15 +6,15 @@ namespace LaylaHft.Platform.MarketData.Services;
 
 public class InMemoryCandleBufferRegistry : ICandleBufferRegistry
 {
-    private readonly ConcurrentDictionary<(string Symbol, KlineInterval Interval), CircularBuffer<CandleSnapshot>> _buffers = new();
+    private readonly ConcurrentDictionary<(string Symbol, string Interval), CircularBuffer<CandleSnapshot>> _buffers = new();
 
-    public void InitializeBuffer(string symbol, KlineInterval interval, int windowSize)
+    public void InitializeBuffer(string symbol, string interval, int windowSize)
     {
         var key = (symbol.ToUpperInvariant(), interval);
         _buffers.TryAdd(key, new CircularBuffer<CandleSnapshot>(windowSize));
     }
 
-    public void Append(string symbol, KlineInterval interval, CandleSnapshot candle)
+    public void Append(string symbol, string interval, CandleSnapshot candle)
     {
         var key = (symbol.ToUpperInvariant(), interval);
 
@@ -24,7 +24,7 @@ public class InMemoryCandleBufferRegistry : ICandleBufferRegistry
         buffer.Add(candle);
     }
 
-    public IReadOnlyList<CandleSnapshot> GetBuffer(string symbol, KlineInterval interval)
+    public IReadOnlyList<CandleSnapshot> GetBuffer(string symbol, string interval)
     {
         var key = (symbol.ToUpperInvariant(), interval);
 
@@ -34,7 +34,7 @@ public class InMemoryCandleBufferRegistry : ICandleBufferRegistry
         return Array.Empty<CandleSnapshot>();
     }
 
-    public void Clear(string symbol, KlineInterval interval)
+    public void Clear(string symbol, string interval)
     {
         var key = (symbol.ToUpperInvariant(), interval);
         _buffers.TryRemove(key, out _);
@@ -45,7 +45,7 @@ public class InMemoryCandleBufferRegistry : ICandleBufferRegistry
         _buffers.Clear();
     }
 
-    public bool IsInitialized(string symbol, KlineInterval interval)
+    public bool IsInitialized(string symbol, string interval)
     {
         var key = (symbol.ToUpperInvariant(), interval);
         return _buffers.ContainsKey(key);
