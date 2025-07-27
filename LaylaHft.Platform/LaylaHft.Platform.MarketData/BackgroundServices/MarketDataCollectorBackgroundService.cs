@@ -161,7 +161,7 @@ public class MarketDataCollectorBackgroundService : BackgroundService
                         .SubscribeToKlineUpdatesAsync(chunk, [interval], onMessage => HandleCandleUpdate(onMessage.Data));
 
                     if (!result.Success)
-                        throw new InvalidOperationException($"Échec WS : {result.Error}");
+                        throw new InvalidOperationException($"\u00c9chec WS : {result.Error}");
                 });
             }
         }

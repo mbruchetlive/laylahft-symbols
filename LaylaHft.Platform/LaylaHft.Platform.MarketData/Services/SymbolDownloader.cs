@@ -109,7 +109,7 @@ public class SymbolDownloader
         _logger = logger;
     }
 
-    public async Task LoadInitialSymbolsAsync(CancellationToken cancellationToken)
+    public async Task<int> LoadInitialSymbolsAsync(CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
 
@@ -182,6 +182,8 @@ public class SymbolDownloader
 
             await new SymbolDownloadCompletedEvent()
                 .PublishAsync(Mode.WaitForNone, cancellationToken);
+
+            return tradable.Count;
         }
         catch (Exception ex)
         {
@@ -194,6 +196,8 @@ public class SymbolDownloader
         {
             _isLoading = false;
         }
+
+        return 0;
     }
 
     public async Task<(int, List<SymbolMetadata>)> GetSymbols(string? exchange, string? quoteClass, string? currency, bool includeInactive, int page, int pageSize, string? sortBy)

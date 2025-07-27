@@ -5,35 +5,48 @@ using LaylaHft.Platform.MarketData.Options;
 using LaylaHft.Platform.MarketData.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 
 namespace LaylaHft.Platform.MarketData.Handlers;
 
 public class CandleReceivedEventHandler(ICandleBufferRegistry bufferRegistry,
     IOptions<MarketDetectionSettings> settings,
     ILogger<CandleReceivedEventHandler> logger,
-    IHubContext<SymbolHub> hub 
+    IHubContext<SymbolHub> hub
     ) : IEventHandler<CandleReceivedEvent>
 {
     private readonly MarketDetectionSettings _settings = settings.Value;
     private readonly IHubContext<SymbolHub> _hub = hub;
 
+    private static readonly Meter _meter = new("LaylaHft.CandleDetection", "1.0");
+    private static readonly Counter<int> _eventDetectedCounter = _meter.CreateCounter<int>("layla_marketdata_change_detected");
+
+    // .NET Metrics (System.Diagnostics.Metrics) ne supporte pas decimal. Conversion explicite nécessaire.
+    private static readonly Histogram<double> _ratioVolumeHistogram = _meter.CreateHistogram<double>("layla_ratio_volume", unit: "ratio");
+    private static readonly Histogram<double> _ratioCloseHistogram = _meter.CreateHistogram<double>("layla_ratio_close", unit: "ratio");
+    private static readonly Histogram<double> _ratioVolatilityHistogram = _meter.CreateHistogram<double>("layla_ratio_volatility", unit: "ratio");
+
+    private static readonly ActivitySource ActivitySource = new("LaylaHft.CandleDetection");
+
     public async Task HandleAsync(CandleReceivedEvent e, CancellationToken ct)
     {
-        logger.LogInformation("Message reçu pour {Symbol} à {CloseTime}", e.Snapshot.Symbol, e.Snapshot.CloseTime);
-
+        using var activity = ActivitySource.StartActivity("HandleCandleReceived");
         var snapshot = e.Snapshot;
 
-        if (!bufferRegistry.IsInitialized(snapshot.Symbol, e.Snapshot.Interval))
+        logger.LogInformation("📩 Bougie reçue pour {Symbol} à {CloseTime}", snapshot.Symbol, snapshot.CloseTime);
+
+        if (!bufferRegistry.IsInitialized(snapshot.Symbol, snapshot.Interval))
         {
-            logger.LogWarning("Le buffer pour {Symbol} / {Interval} n’est pas initialisé.", snapshot.Symbol, e.Snapshot.Interval);
+            logger.LogWarning("⚠️ Buffer non initialisé pour {Symbol} / {Interval}", snapshot.Symbol, snapshot.Interval);
             return;
         }
 
-        var buffer = bufferRegistry.GetBuffer(snapshot.Symbol, e.Snapshot.Interval);
+        var buffer = bufferRegistry.GetBuffer(snapshot.Symbol, snapshot.Interval);
 
         if (buffer.Count < 20)
         {
-            logger.LogWarning("Le buffer pour {Symbol} / {Interval} contient moins de 20 bougies.", snapshot.Symbol, e.Snapshot.Interval);
+            logger.LogWarning("⚠️ Buffer insuffisant pour {Symbol} / {Interval} : {Count} bougies", snapshot.Symbol, snapshot.Interval, buffer.Count);
             return;
         }
 
@@ -41,24 +54,24 @@ public class CandleReceivedEventHandler(ICandleBufferRegistry bufferRegistry,
         var avgClose = buffer.Average(c => c.Close);
         var avgVolatility = buffer.Average(c => c.High - c.Low);
 
-        logger.LogInformation("Volume moyen: {AvgVolume}, Close moyen: {AvgClose}, Volatilité moyenne: {AvgVolatility}", avgVolume, avgClose, avgVolatility);
+        logger.LogInformation("📊 Moyennes pour {Symbol}: Volume={AvgVolume}, Close={AvgClose}, Volatilité={AvgVolatility}", snapshot.Symbol, avgVolume, avgClose, avgVolatility);
 
         if (avgVolume == 0 || avgClose == 0 || avgVolatility == 0)
         {
-            logger.LogWarning("Impossible de calculer les ratios car une des moyennes est nulle pour {Symbol}.", snapshot.Symbol);
+            logger.LogWarning("⚠️ Moyenne nulle pour {Symbol}, impossible de calculer les ratios.", snapshot.Symbol);
             return;
         }
-
-        logger.LogInformation("Calcul des ratios pour {Symbol} / {Interval}", snapshot.Symbol, e.Snapshot.Interval);
 
         var ratioVolume = snapshot.Volume / avgVolume;
         var ratioClose = snapshot.Close / avgClose;
         var ratioVolatility = (snapshot.High - snapshot.Low) / avgVolatility;
 
-        logger.LogInformation("Ratios calculés pour {Symbol} / {Interval} - Volume: {RatioVolume}, Close: {RatioClose}, Volatilité: {RatioVolatility}", 
-            snapshot.Symbol, e.Snapshot.Interval, ratioVolume, ratioClose, ratioVolatility);
+        _ratioVolumeHistogram.Record((double)ratioVolume);
+        _ratioCloseHistogram.Record((double)ratioClose);
+        _ratioVolatilityHistogram.Record((double)ratioVolatility);
 
-        logger.LogInformation("Analyse des changements pour {Symbol} à {CloseTime}", snapshot.Symbol, snapshot.CloseTime);
+        logger.LogInformation("📈 Ratios pour {Symbol} / {Interval}: Volume={RatioVolume}, Close={RatioClose}, Volatilité={RatioVolatility}",
+            snapshot.Symbol, snapshot.Interval, ratioVolume, ratioClose, ratioVolatility);
 
         var changeTypes = new List<string>();
 
@@ -73,7 +86,9 @@ public class CandleReceivedEventHandler(ICandleBufferRegistry bufferRegistry,
 
         if (changeTypes.Any())
         {
-            logger.LogInformation("Changements détectés pour {Symbol} à {CloseTime}: {ChangeTypes}", snapshot.Symbol, snapshot.CloseTime, string.Join(", ", changeTypes));
+            logger.LogInformation("⚡ Changement détecté pour {Symbol} à {CloseTime}: {ChangeTypes}", snapshot.Symbol, snapshot.CloseTime, string.Join(", ", changeTypes));
+
+            _eventDetectedCounter.Add(1);
 
             var evt = new MarketDataChange
             {

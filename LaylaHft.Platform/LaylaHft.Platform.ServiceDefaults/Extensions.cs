@@ -62,6 +62,8 @@ public static class Extensions
                     .AddMeter("LaylaHft.SymbolStore")
                     .AddMeter("LaylaHft.MarketStats")
                     .AddMeter("LaylaHft.MarketDataCollectorWorker")
+                    .AddMeter("LaylaHft.SymbolDownloader")
+                    .AddMeter("LaylaHft.SymbolDownloaderBackgroundService")
                     ;
             })
             .WithTracing(tracing =>

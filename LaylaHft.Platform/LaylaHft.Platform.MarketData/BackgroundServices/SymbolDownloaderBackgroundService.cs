@@ -5,49 +5,60 @@
 using LaylaHft.Platform.MarketData.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 
 public class SymbolDownloaderBackgroundService : BackgroundService
 {
-    private readonly SymbolDownloader _downloader;
     private readonly ILogger<SymbolDownloaderBackgroundService> _logger;
-    private readonly TimeSpan _refreshInterval = TimeSpan.FromHours(12);
+    private readonly SymbolDownloader _downloader;
+    private readonly ISymbolStore _store;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly PeriodicTimer _timer = new(TimeSpan.FromHours(12));
 
-    public SymbolDownloaderBackgroundService(SymbolDownloader downloader, ILogger<SymbolDownloaderBackgroundService> logger)
+    private static readonly Meter _meter = new("LaylaHft.SymbolDownloader", "1.0");
+    private static readonly Counter<int> _symbolDownloadCounter = _meter.CreateCounter<int>("layla_symbols_downloaded");
+    private static readonly Counter<int> _symbolDownloadErrors = _meter.CreateCounter<int>("layla_symbol_download_errors");
+    private static readonly Histogram<double> _symbolDownloadDuration = _meter.CreateHistogram<double>("layla_symbol_download_duration", unit: "ms");
+    private static readonly ActivitySource ActivitySource = new("LaylaHft.SymbolDownloader");
+
+    public SymbolDownloaderBackgroundService(
+        ILogger<SymbolDownloaderBackgroundService> logger,
+        SymbolDownloader downloader,
+        ISymbolStore store,
+        IServiceProvider serviceProvider)
     {
-        _downloader = downloader;
         _logger = logger;
+        _downloader = downloader;
+        _store = store;
+        _serviceProvider = serviceProvider;
     }
 
-    public override async Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("[SymbolDownloaderBackground] Initial load started...");
-        try
+        do
         {
-            await _downloader.LoadInitialSymbolsAsync(cancellationToken);
-            _logger.LogInformation("[SymbolDownloaderBackground] Initial load completed.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[SymbolDownloaderBackground] Initial load failed.");
-        }
-        await base.StartAsync(cancellationToken);
-    }
+            using var activity = ActivitySource.StartActivity("DownloadSymbols.Cycle");
+            var sw = Stopwatch.StartNew();
 
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
-    {
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            _logger.LogInformation("[SymbolDownloaderBackground] Scheduled refresh started...");
             try
             {
-                await _downloader.LoadInitialSymbolsAsync(cancellationToken);
-                _logger.LogInformation("[SymbolDownloaderBackground] Refresh completed.");
+                _logger.LogInformation("🔽 Téléchargement des symboles en cours...");
+                var count = await _downloader.LoadInitialSymbolsAsync(stoppingToken);
+                _symbolDownloadCounter.Add(count);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[SymbolDownloaderBackground] Refresh failed.");
+                _symbolDownloadErrors.Add(1);
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                _logger.LogError(ex, "Erreur lors du téléchargement des symboles.");
             }
-            await Task.Delay(_refreshInterval, cancellationToken);
-        }
+            finally
+            {
+                sw.Stop();
+                _symbolDownloadDuration.Record(sw.Elapsed.TotalMilliseconds);
+            }
+
+        } while (await _timer.WaitForNextTickAsync(stoppingToken));
     }
 }
