@@ -71,7 +71,7 @@ public class MarketDataCollectorBackgroundService : BackgroundService
 
         try
         {
-            _logger.LogInformation("🕒 En attente de SymbolDownloadCompletedEvent...");
+            _logger.LogInformation("🕒 En attente de SymbolDownloadedEvent...");
             await _initialTrigger.Task.WaitAsync(stoppingToken);
 
             _logger.LogInformation("🚀 Symboles téléchargés. Initialisation du MarketDataCollector...");
@@ -85,7 +85,7 @@ public class MarketDataCollectorBackgroundService : BackgroundService
             {
                 try
                 {
-                    _logger.LogInformation("🔁 Timer 12h déclenché. Attente du SymbolDownloadCompletedEvent pour redémarrage...");
+                    _logger.LogInformation("🔁 Timer 12h déclenché. Attente du SymbolDownloadedEvent pour redémarrage...");
                     _recycleTrigger = CreateNewTrigger();
                     await _recycleTrigger.Task.WaitAsync(stoppingToken);
                     await RestartSessionAsync(stoppingToken);
@@ -178,20 +178,80 @@ public class MarketDataCollectorBackgroundService : BackgroundService
         _ => throw new ArgumentException($"Timeframe non supporté : {tf}")
     };
 
+    private static string ConvertFromKlineInterval(KlineInterval interval) => interval switch
+    {
+        KlineInterval.OneMinute => "M1",
+        KlineInterval.ThreeMinutes => "M3",
+        KlineInterval.FiveMinutes => "M5",
+        KlineInterval.FifteenMinutes => "M15",
+        KlineInterval.ThirtyMinutes => "M30",
+        KlineInterval.OneHour => "H1",
+        KlineInterval.TwoHour => "H2",
+        KlineInterval.FourHour => "H4",
+        KlineInterval.SixHour => "H6",
+        KlineInterval.EightHour => "H8",
+        KlineInterval.TwelveHour => "H12",
+        KlineInterval.OneDay => "D1",
+        KlineInterval.ThreeDay => "D3",
+        KlineInterval.OneWeek => "W1",
+        KlineInterval.OneMonth => "MN",
+        _ => throw new ArgumentOutOfRangeException(nameof(interval), $"Interval non supporté : {interval}")
+    };
+
     internal void HandleCandleUpdate(IBinanceStreamKlineData data)
     {
-        if (data?.Data == null || !data.Data.Final)
+        if (data?.Data == null)
             return;
 
         var kline = data.Data;
+
+        if (string.IsNullOrEmpty(data.Symbol))
+        {
+            _logger.LogWarning("Données de bougie invalide reçues - symbole non identifiable : {Data}", data);
+            return;
+        }
+
+        if (kline.ClosePrice <= 0 || kline.Volume <= 0)
+        {
+            _logger.LogDebug("Bougie invalide reçue prix ou volume invalide ou égale à 0 : {Kline}", kline);
+            return;
+        }
+
+        var tf = ConvertFromKlineInterval(kline.Interval);
+
+        // 📌 Calcul de pondération pour bougie en cours
+        double maturityFactor = 1.0;
+        var totalSeconds = (kline.CloseTime - kline.OpenTime).TotalSeconds;
+        var elapsedSeconds = (DateTime.UtcNow - kline.OpenTime).TotalSeconds;
+
+        maturityFactor = Math.Clamp(elapsedSeconds / totalSeconds, 0.0, 1.0);
+
+        _logger.LogDebug("Bougie {Symbol} ({TF}) - Maturité {Weight:P2} CloseTime={CloseTime}",
+            data.Symbol, tf, maturityFactor, kline.CloseTime);
+
         var snapshot = new CandleSnapshot(
             kline.OpenTime, kline.CloseTime, kline.OpenPrice, kline.HighPrice,
-            kline.LowPrice, kline.ClosePrice, kline.Volume, data.Symbol, kline.Interval.ToString().ToUpperInvariant()
-        );
+            kline.LowPrice, kline.ClosePrice, kline.Volume, data.Symbol, tf
+        )
+        {
+            Weight = maturityFactor
+        };
 
-        _bufferRegistry.Append(data.Symbol, kline.Interval.ToString(), snapshot);
-        _ = OnCandleMessageAsync(snapshot, CancellationToken.None);
+        // 📌 Le buffer décide si c’est une mise à jour partielle ou une clôture
+        var closedCandle = _bufferRegistry.UpdatePartialCandle(data.Symbol, tf, snapshot);
+
+        // 📢 Si le buffer retourne une bougie close → publication
+        if (closedCandle != null)
+        {
+            _logger.LogInformation("Bougie close détectée et publiée {Symbol} {TF} - Close={Close}",
+                closedCandle.Symbol, closedCandle.Interval, closedCandle.Close);
+
+            _bufferRegistry.Append(data.Symbol, tf, closedCandle);
+            _ = OnCandleMessageAsync(closedCandle, CancellationToken.None);
+        }
     }
+
+
 
     private async Task OnCandleMessageAsync(CandleSnapshot data, CancellationToken cancellationToken)
     {

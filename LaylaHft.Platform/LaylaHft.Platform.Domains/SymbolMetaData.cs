@@ -26,6 +26,7 @@ public class SymbolMetadata
     [Key(18)] public SparklineData Sparkline { get; set; } = new();
     [Key(19)] public string IconUrl { get; set; }
     [Key(20)] public SymbolStatus Status { get; set; }
+    [Key(21)] public decimal Volume { get; set; }
 }
 
 [MessagePackObject]

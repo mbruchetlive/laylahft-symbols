@@ -3,6 +3,7 @@ using Binance.Net.Interfaces;
 using Binance.Net.Interfaces.Clients;
 using LaylaHft.Platform.Domains;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Configuration;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Threading;
@@ -15,12 +16,14 @@ public class InMemorySymbolMarketStatsCalculator : ISymbolMarketStatsCalculator
     private readonly ISymbolStore _store;
     private readonly IHubContext<SymbolHub> _hub;
     private readonly ILogger<InMemorySymbolMarketStatsCalculator> _logger;
-
+    private readonly IKlineCacheStore _klineCacheStore;
     private static readonly Meter _meter;
     private static readonly Counter<int> _successCounter;
     private static readonly Counter<int> _failureCounter;
     private static readonly Histogram<double> _durationHistogram;
     private static readonly ActivitySource _activitySource;
+
+    public List<string> Timeframes { get; }
 
     static InMemorySymbolMarketStatsCalculator()
     {
@@ -40,12 +43,23 @@ public class InMemorySymbolMarketStatsCalculator : ISymbolMarketStatsCalculator
         IBinanceRestClient client,
         ISymbolStore store,
         IHubContext<SymbolHub> hub,
+        IKlineCacheStore klineCacheStore,
+        IConfiguration configuration,
         ILogger<InMemorySymbolMarketStatsCalculator> logger)
     {
         _client = client;
         _store = store;
         _hub = hub;
         _logger = logger;
+        _klineCacheStore = klineCacheStore;
+
+        var timeframes = configuration.GetSection("Timeframes").Get<List<string>>();
+        
+        if (timeframes == null || timeframes.Count == 0)
+            throw new InvalidOperationException("Configuration invalide : section 'Timeframes' absente ou vide.");
+
+        Timeframes = timeframes;
+
     }
 
     public async Task CalculateAsync(SymbolMetadata symbol)
@@ -57,54 +71,74 @@ public class InMemorySymbolMarketStatsCalculator : ISymbolMarketStatsCalculator
         {
             _logger.LogInformation("⏳ Démarrage du calcul des stats pour {Symbol}", symbol.Symbol);
 
-            IBinanceKline[] klines = Array.Empty<IBinanceKline>();
+            var klines = new Dictionary<string, IBinanceKline[]>();
 
-            for (int attempt = 1; attempt <= 3; attempt++)
+            // 📌 Chargement des klines pour chaque interval
+            foreach (var interval in Timeframes)
             {
-                var result = await _client.SpotApi.ExchangeData.GetKlinesAsync(
-                    symbol.Symbol,
-                    KlineInterval.OneDay,
-                    limit: 30);
-
-                if (result.Success && result.Data.Length >= 2)
+                for (int attempt = 1; attempt <= 3; attempt++)
                 {
-                    klines = result.Data;
-                    break;
+                    var result = await _client.SpotApi.ExchangeData.GetKlinesAsync(
+                        symbol.Symbol,
+                        ConvertToKlineInterval(interval),
+                        limit: 30);
+
+                    if (result.Success && result.Data.Length > 0)
+                    {
+                        _klineCacheStore.SetKlines(symbol.Symbol, interval, result.Data.ToList());
+                        klines[interval] = result.Data;
+                        break;
+                    }
+
+                    _logger.LogWarning("Tentative {Attempt}/3 échouée pour {Symbol} interval {Interval}. Erreur : {Error}",
+                        attempt, symbol.Symbol, interval, result.Error?.Message);
+
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)));
                 }
-
-                _logger.LogWarning("Tentative {Attempt}/3 échouée pour {Symbol}. Erreur : {Error}",
-                    attempt, symbol.Symbol, result.Error?.Message);
-
-                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)));
             }
 
-            if (klines.Length < 2)
+            decimal lastPrice;
+            List<decimal> closesD1 = new();
+
+            // 📌 Fallback si D1 absent
+            if (klines.TryGetValue("D1", out var d1Klines) && d1Klines.Length > 0)
             {
-                _logger.LogWarning("⚠️ Échec du chargement des klines pour {Symbol} après 3 tentatives", symbol.Symbol);
-                _failureCounter.Add(1);
+                closesD1 = d1Klines.Select(k => k.ClosePrice).ToList();
+                lastPrice = closesD1.Last();
+            }
+            else if (klines.TryGetValue("H1", out var h1Klines) && h1Klines.Length >= 24)
+            {
+                _logger.LogWarning("D1 manquant pour {Symbol}, fallback sur H1", symbol.Symbol);
+                closesD1 = h1Klines.TakeLast(24).Select(k => k.ClosePrice).ToList();
+                lastPrice = closesD1.Last();
+            }
+            else
+            {
+                _logger.LogWarning("⏭ Pas de données suffisantes pour {Symbol} (ni D1 ni H1)", symbol.Symbol);
                 return;
             }
 
-            var closes = klines.Select(k => k.ClosePrice).ToList();
-            var last = closes[^1];
-            symbol.CurrentPrice = last;
+            // 📊 Calculs
+            symbol.CurrentPrice = lastPrice;
+            symbol.Change24hPct = closesD1.Count >= 2 ? ComputePct(lastPrice, closesD1[^2]) : 0;
+            symbol.Change7dPct = closesD1.Count >= 8 ? ComputePct(lastPrice, closesD1[^8]) : 0;
+            symbol.Change30dPct = closesD1.Count >= 30 ? ComputePct(lastPrice, closesD1[0]) : 0;
 
-            symbol.Change24hPct = closes.Count >= 2 ? ComputePct(last, closes[^2]) : 0;
-            symbol.Change7dPct = closes.Count >= 8 ? ComputePct(last, closes[^8]) : 0;
-            symbol.Change30dPct = closes.Count >= 30 ? ComputePct(last, closes[0]) : 0;
-
+            // 📈 Sparkline
             symbol.Sparkline = new SparklineData
             {
-                Data = closes,
-                Color = (closes.Count >= 30 ? symbol.Change30dPct : symbol.Change7dPct) >= 0 ? "green" : "red"
+                Data = closesD1,
+                Color = (closesD1.Count >= 30 ? symbol.Change30dPct : symbol.Change7dPct) >= 0 ? "green" : "red"
             };
 
+            // 💾 Stockage et notification
             await _store.Upsert(symbol.Exchange, symbol.QuoteAsset, symbol.Symbol, symbol);
             await _hub.Clients.All.SendAsync("SymbolUpdated", symbol);
 
             _successCounter.Add(1);
+
             _logger.LogInformation("✅ Calcul terminé pour {Symbol} | Prix: {Price}, 24h: {Change24h}%",
-                symbol.Symbol, last, symbol.Change24hPct);
+                symbol.Symbol, lastPrice, symbol.Change24hPct);
         }
         catch (Exception ex)
         {
@@ -117,6 +151,18 @@ public class InMemorySymbolMarketStatsCalculator : ISymbolMarketStatsCalculator
             _durationHistogram.Record(stopwatch.Elapsed.TotalMilliseconds);
         }
     }
+
+    private static KlineInterval ConvertToKlineInterval(string tf) => tf.ToUpperInvariant() switch
+    {
+        "M1" => KlineInterval.OneMinute,
+        "M5" => KlineInterval.FiveMinutes,
+        "M15" => KlineInterval.FifteenMinutes,
+        "H1" => KlineInterval.OneHour,
+        "H4" => KlineInterval.FourHour,
+        "D1" => KlineInterval.OneDay,
+        _ => throw new ArgumentException($"Timeframe non supporté : {tf}")
+    };
+
 
     private static decimal ComputePct(decimal current, decimal reference)
         => reference != 0 ? Math.Round(((current - reference) / reference) * 100, 2) : 0;

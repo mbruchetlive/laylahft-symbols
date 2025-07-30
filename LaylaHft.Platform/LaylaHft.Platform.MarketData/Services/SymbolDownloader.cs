@@ -1,65 +1,20 @@
-﻿namespace LaylaHft.Platform.MarketData.Services;
-
-// US01 - Téléchargement initial des symboles via Binance.Net
-
-/*
-SPECIFICATION DE L’US01 : Téléchargement initial des symboles
-
-Objectif :
-Télécharger la liste complète des symboles de Binance dès le démarrage de l’application,
-les filtrer, les transformer en objets métier (SymbolMetadata), et les stocker en mémoire (ConcurrentDictionary) pour le reste des composants.
-
-Étapes fonctionnelles :
-1. Utiliser la méthode GetExchangeInfoAsync() de Binance.Net
-2. Filtrer les symboles actifs :
-   - status == Trading
-   - isSpotTradingAllowed == true
-3. Pour chaque symbole valide :
-   - Extraire les métadonnées : baseAsset, quoteAsset, symbol, précisions
-   - Extraire les filtres : tickSize, stepSize, min/max qty, minNotional
-   - Générer un objet SymbolMetadata
-4. Ajouter le symbole au dictionnaire mémoire (clé = symbol)
-5. Logger le nombre de symboles chargés
-6. Émettre un événement via IEventDispatcher ("SymbolListInitialized")
-7. En cas d’erreur, logger l’échec et relancer l’exception (ou fallback)
-
-Critères d’acceptation :
-- La liste contient uniquement les symboles actifs
-- Chaque symbole est bien mappé et stocké
-- L’événement de fin de chargement est émis
-- Les erreurs sont tracées proprement
-* */
-
-/*
- * US 5 : Récupération en mode failback
- * En tant que DataAggregator, je veux lire les symboles depuis un cache local en cas d’échec, afin de continuer à servir des données aux services même sans accès réseau.
-* */
-
-/*
- * US 6 : Surveillance de la connectivité
- * En tant que opérateur, je veux voir dans les logs si le système fonctionne en mode failback, afin de réagir rapidement en cas de problème réseau/API.
- * */
-
-/*
- * US 8 : Notification d'événements de mise à jour, 
- * En tant que module dépendant (API, WebSocket, moteur), je veux être notifié lorsqu’un symbole est ajouté ou mis à jour, afin de réagir en temps réel aux changements de données. je pense qu'il faut qu'on crée un signal-r hub et l'invoquer depuis le service downloader. 
-* */
-using Binance.Net.Clients;
+﻿using Binance.Net.Interfaces;
 using Binance.Net.Interfaces.Clients;
-using Binance.Net.Objects.Models.Spot;
 using FastEndpoints;
 using LaylaHft.Platform.Domains;
 using LaylaHft.Platform.MarketData.Events;
-using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Threading;
+
+namespace LaylaHft.Platform.MarketData.Services;
 
 public class SymbolDownloader
 {
     private readonly IBinanceRestClient _client;
     private readonly ISymbolStore _store;
     private readonly ILogger<SymbolDownloader> _logger;
-
+    private readonly ISymbolStatsQueue _queue;
     private volatile bool _isLoading = false;
     public bool IsLoading => _isLoading;
     private Timer? _reconnectTimer;
@@ -67,6 +22,18 @@ public class SymbolDownloader
 
     public bool IsOnline { get; private set; }
     public DateTime LastDownloadDate { get; private set; }
+
+    public SymbolDownloader(
+        IBinanceRestClient client,
+        ISymbolStore store,
+        ISymbolStatsQueue queue,
+        ILogger<SymbolDownloader> logger)
+    {
+        _client = client;
+        _store = store;
+        _logger = logger;
+        _queue = queue;
+    }
 
     public void StartConnectivityMonitor(CancellationToken cancellationToken)
     {
@@ -85,10 +52,11 @@ public class SymbolDownloader
                     _reconnectTimer?.Dispose();
                     _reconnectTimer = null;
                     _isInFallback = false;
+
                     await LoadInitialSymbolsAsync(cancellationToken);
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "[Symbols] Failed to load from Binance. Entering FAILBACK MODE.");
                 _isInFallback = true;
@@ -99,91 +67,112 @@ public class SymbolDownloader
         TimeSpan.FromMinutes(1));    // Ensuite toutes les minutes
     }
 
-    public SymbolDownloader(
-        IBinanceRestClient client,
-        ISymbolStore store,
-        ILogger<SymbolDownloader> logger)
-    {
-        _client = client;
-        _store = store;
-        _logger = logger;
-    }
-
     public async Task<int> LoadInitialSymbolsAsync(CancellationToken cancellationToken)
     {
-        var stopwatch = Stopwatch.StartNew();
-
         _isLoading = true;
+        var stopwatch = Stopwatch.StartNew();
 
         try
         {
-            var result = await _client.SpotApi.ExchangeData.GetExchangeInfoAsync();
-            if (!result.Success || result.Data == null)
-            {
-                _logger.LogWarning("Failed to get exchange info from Binance: {Error}", result.Error);
-                throw new Exception("Binance API failed");
-            }
+            _logger.LogInformation("[Symbols] Starting initial symbol download from Binance...");
 
-            var tradable = result.Data.Symbols
+            // 1 Récupération ExchangeInfo
+            var exchangeInfoResult = await _client.SpotApi.ExchangeData.GetExchangeInfoAsync();
+            
+            if (!exchangeInfoResult.Success || exchangeInfoResult.Data == null)
+                throw new Exception("Failed to retrieve ExchangeInfo");
+
+            _logger.LogInformation(message:"[{Exchange}] ExchangeInfo loaded successfully. Found {Count} symbols.", "Binance", exchangeInfoResult.Data.Symbols.Length);
+
+            var tradableSymbols = exchangeInfoResult.Data.Symbols
                 .Where(s => s.Status == Binance.Net.Enums.SymbolStatus.Trading && s.IsSpotTradingAllowed)
+                .Select(s => s.Name)
                 .ToList();
 
-            var importedCount = 0;
+            // 2 Récupération tickers par batch de 100 symboles (max 5 en parallèle)
+            var allTickers = new ConcurrentBag<IBinanceTick>();
+            var semaphore = new SemaphoreSlim(5); // max 5 appels simultanés
 
-            foreach (var s in tradable)
-            {
-                var priceFilter = s.Filters.OfType<BinanceSymbolPriceFilter>().FirstOrDefault();
-                var lotFilter = s.Filters.OfType<BinanceSymbolLotSizeFilter>().FirstOrDefault();
-                var notionalFilter = s.Filters.OfType<BinanceSymbolMinNotionalFilter>().FirstOrDefault();
-
-                var metadata = new SymbolMetadata
+            var chunkTasks = tradableSymbols
+                .Chunk(100)
+                .Select(async chunk =>
                 {
-                    Symbol = s.Name,
-                    Name = $"{s.BaseAsset} / {s.QuoteAsset}",
+                    await semaphore.WaitAsync(cancellationToken);
+                    try
+                    {
+                        var tickersResult = await _client.SpotApi.ExchangeData.GetTickersAsync(chunk.ToList(), cancellationToken);
+                        if (tickersResult.Success && tickersResult.Data != null)
+                        {
+                            foreach (var ticker in tickersResult.Data)
+                                allTickers.Add(ticker);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("[Symbols] Failed to get tickers for chunk. Error: {Error}", tickersResult.Error);
+                        }
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                });
+
+            await Task.WhenAll(chunkTasks);
+
+            // 3 Enrichissement symboles avec tickers
+            var enrichedSymbols = exchangeInfoResult.Data.Symbols
+                .Join(allTickers, s => s.Name, t => t.Symbol, (s, t) => new
+                {
+                    Symbol = s,
+                    Ticker = t
+                })
+                .ToList();
+
+            // 4 Sélection top 100 volume / prix / change
+            var topVolume = enrichedSymbols.OrderByDescending(x => x.Ticker.Volume).Take(100);
+            var topPrice = enrichedSymbols.OrderByDescending(x => x.Ticker.LastPrice).Take(100);
+            var topChange = enrichedSymbols.OrderByDescending(x => Math.Abs(x.Ticker.PriceChangePercent)).Take(100);
+
+            var selected = topVolume
+                .Concat(topPrice)
+                .Concat(topChange)
+                .DistinctBy(x => x.Symbol.Name)
+                .ToList();
+
+            // 5 Stockage + mise en queue symbole par symbole
+            foreach (var entry in selected)
+            {
+                var meta = new SymbolMetadata
+                {
+                    Symbol = entry.Symbol.Name,
+                    Name = $"{entry.Symbol.BaseAsset} / {entry.Symbol.QuoteAsset}",
                     Exchange = "Binance",
-                    BaseAsset = s.BaseAsset,
-                    QuoteAsset = s.QuoteAsset,
-                    PricePrecision = s.QuoteAssetPrecision,
-                    QuantityPrecision = s.BaseAssetPrecision,
-                    TickSize = priceFilter?.TickSize ?? 0,
-                    MinPrice = priceFilter?.MinPrice ?? 0,
-                    MaxPrice = priceFilter?.MaxPrice ?? 0,
-                    StepSize = lotFilter?.StepSize ?? 0,
-                    MinQty = lotFilter?.MinQuantity ?? 0,
-                    MaxQty = lotFilter?.MaxQuantity ?? 0,
-                    MinNotional = notionalFilter?.MinNotional ?? 0,
-                    CurrentPrice = 0,
-                    Change24hPct = 0,
-                    Change7dPct = 0,
-                    Change30dPct = 0,
-                    Sparkline = new(),
-                    IconUrl = $"https://cdn.exemple.com/assets/icons/{s.BaseAsset}.svg"
+                    BaseAsset = entry.Symbol.BaseAsset,
+                    QuoteAsset = entry.Symbol.QuoteAsset,
+                    CurrentPrice = entry.Ticker.LastPrice,
+                    Change24hPct = entry.Ticker.PriceChangePercent,
+                    Volume = entry.Ticker.Volume,
+                    IconUrl = $"https://cdn.exemple.com/assets/icons/{entry.Symbol.BaseAsset}.svg"
                 };
 
-                await _store.Upsert(metadata.Exchange, metadata.QuoteAsset, metadata.Symbol, metadata);
+                await _store.Upsert(meta.Exchange, meta.QuoteAsset, meta.Symbol, meta);
 
-                await new SymbolImportedEvent
-                {
-                    Symbol = metadata.Symbol,
-                    Exchange = metadata.Exchange,
-                    QuoteAsset = metadata.QuoteAsset
-                }.PublishAsync(Mode.WaitForNone);
-
-                importedCount++;
+                // Mise en queue pour stats
+                await _queue.EnqueueAsync(meta);
             }
 
             await _store.SaveToFileAsync();
-
             stopwatch.Stop();
-            _logger.LogInformation("[Symbols] Loaded {Count} symbols from Binance in {Elapsed} ms.", importedCount, stopwatch.Elapsed.TotalMilliseconds);
 
-            IsOnline = true;
-            LastDownloadDate = DateTime.Now;
+            _logger.LogInformation("[Symbols] Loaded {Count} filtered symbols in {Elapsed} ms",
+                selected.Count, stopwatch.Elapsed.TotalMilliseconds);
 
-            await new SymbolDownloadCompletedEvent()
-                .PublishAsync(Mode.WaitForNone, cancellationToken);
+            await _queue.WaitForProcessingAsync(cancellationToken);
 
-            return tradable.Count;
+            // 6 Notifier que le download est terminé
+            await new SymbolDownloadedEvent().PublishAsync(Mode.WaitForNone, cancellationToken);
+
+            return selected.Count;
         }
         catch (Exception ex)
         {
@@ -199,6 +188,7 @@ public class SymbolDownloader
 
         return 0;
     }
+
 
     public async Task<(int, List<SymbolMetadata>)> GetSymbols(string? exchange, string? quoteClass, string? currency, bool includeInactive, int page, int pageSize, string? sortBy)
     {

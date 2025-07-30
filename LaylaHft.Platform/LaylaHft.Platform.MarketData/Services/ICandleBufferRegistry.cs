@@ -11,4 +11,5 @@ public interface ICandleBufferRegistry
     void Clear(string symbol, string interval);
     void ClearAll();
     bool IsInitialized(string symbol, string interval);
+    CandleSnapshot? UpdatePartialCandle(string symbol, string tf, CandleSnapshot snapshot);
 }

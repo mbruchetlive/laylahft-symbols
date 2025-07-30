@@ -14,6 +14,7 @@ public class CandleSnapshot()
     [Key(6)] public decimal Volume { get; set; }
     [Key(7)] public string Symbol { get; set; } = string.Empty;
     [Key(8)] public string Interval { get; set; } = string.Empty;
+    [Key(9)] public double Weight { get; set; }
 
     public CandleSnapshot(DateTime openTime, DateTime closeTime, decimal open, decimal high, decimal low, decimal close, decimal volume, string symbol, string interval):this()
     {

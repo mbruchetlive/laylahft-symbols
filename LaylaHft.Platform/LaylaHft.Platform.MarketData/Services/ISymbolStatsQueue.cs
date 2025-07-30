@@ -1,9 +1,12 @@
-﻿using LaylaHft.Platform.MarketData.Events;
+﻿using LaylaHft.Platform.Domains;
 
 namespace LaylaHft.Platform.MarketData.Services;
 
 public interface ISymbolStatsQueue
 {
-    Task EnqueueAsync(SymbolImportedEvent e);
-    ValueTask<SymbolImportedEvent> DequeueAsync(CancellationToken ct);
+    Task EnqueueAsync(SymbolMetadata e);
+    ValueTask<SymbolMetadata> DequeueAsync(CancellationToken ct);
+    Task WaitForProcessingAsync(CancellationToken cancellationToken);
+    void MarkProcessed();
+    void Reset();
 }

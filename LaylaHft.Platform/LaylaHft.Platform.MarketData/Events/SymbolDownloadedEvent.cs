@@ -2,7 +2,7 @@
 
 namespace LaylaHft.Platform.MarketData.Events;
 
-public class SymbolDownloadCompletedEvent : IEvent
+public class SymbolDownloadedEvent : IEvent
 {
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
 }

@@ -31,4 +31,8 @@
     <ProjectReference Include="..\LaylaHft.Platform.Shared\LaylaHft.Platform.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Data\" />
+  </ItemGroup>
+
 </Project>

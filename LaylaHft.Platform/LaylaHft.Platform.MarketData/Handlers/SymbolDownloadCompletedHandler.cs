@@ -4,7 +4,7 @@ using LaylaHft.Platform.MarketData.Events;
 
 namespace LaylaHft.Platform.MarketData.Handlers;
 
-public class SymbolDownloadCompletedHandler : IEventHandler<SymbolDownloadCompletedEvent>
+public class SymbolDownloadCompletedHandler : IEventHandler<SymbolDownloadedEvent>
 {
     private readonly MarketDataCollectorBackgroundService _collector;
 
@@ -13,7 +13,7 @@ public class SymbolDownloadCompletedHandler : IEventHandler<SymbolDownloadComple
         _collector = collector;
     }
 
-    public Task HandleAsync(SymbolDownloadCompletedEvent _, CancellationToken ct)
+    public Task HandleAsync(SymbolDownloadedEvent _, CancellationToken ct)
     {
         _collector.NotifyStart(ct); // débloque les TCS
         return Task.CompletedTask;

@@ -38,24 +38,24 @@ public class SymbolStatsProcessorService : BackgroundService
         {
             try
             {
-                var evt = await _queue.DequeueAsync(ct);
+                var symbol = await _queue.DequeueAsync(ct);
                 using var scope = _sp.CreateScope();
 
                 var store = scope.ServiceProvider.GetRequiredService<ISymbolStore>();
                 var calculator = scope.ServiceProvider.GetRequiredService<ISymbolMarketStatsCalculator>();
 
-                var symbol = await store.GetAsync(evt.Exchange, evt.QuoteAsset, evt.Symbol);
-
                 if (symbol == null)
                 {
-                    _logger.LogWarning("[Worker {Worker}] Symbol not found in store: {Exchange}/{QuoteAsset}/{Symbol}", workerId, evt.Exchange, evt.QuoteAsset, evt.Symbol);
+                    _logger.LogWarning("❗ [Worker {Worker}] Received null symbol, skipping processing", workerId);
                     continue;
                 }
 
                 await calculator.CalculateAsync(symbol);
                 await store.Upsert(symbol.Exchange, symbol.QuoteAsset, symbol.Symbol, symbol);
 
-                _logger.LogInformation("✅ [Worker {Worker}] Stats calculated for {Symbol}", workerId, symbol.Symbol);
+                _logger.LogInformation("✅ [Worker {Worker}] Stats calculated for {Symbol}/{Exchange}", workerId, symbol.Symbol, symbol.Exchange);
+
+                _queue.MarkProcessed();
 
                 await Task.Delay(200, ct); // Throttle processing
             }

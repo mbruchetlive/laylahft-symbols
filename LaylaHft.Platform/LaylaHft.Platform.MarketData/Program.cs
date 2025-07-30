@@ -3,9 +3,7 @@ using FastEndpoints.Security;
 using FastEndpoints.Swagger;
 using LaylaHft.Platform.MarketData;
 using LaylaHft.Platform.MarketData.BackgroundServices;
-using LaylaHft.Platform.MarketData.Options;
 using LaylaHft.Platform.MarketData.Services;
-using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("LaylaHft.Platform.Tests")]
@@ -55,10 +53,14 @@ builder.Services.AddSingleton<IMyAuthService, MyAuthService>();
 builder.Services.AddSingleton<ISymbolMarketStatsCalculator, InMemorySymbolMarketStatsCalculator>();
 builder.Services.AddSingleton<ISymbolStatsQueue, InMemorySymbolStatsQueue>();
 builder.Services.AddSingleton<ICandleBufferRegistry, InMemoryCandleBufferRegistry>();
+builder.Services.AddSingleton<IKlineCacheStore, InMemoryKlineCacheStore>();
 
 builder.Services.AddHostedService<SymbolDownloaderBackgroundService>();
 builder.Services.AddHostedService<SymbolStatsProcessorService>();
-builder.Services.AddHostedService<MarketDataCollectorBackgroundService>();
+
+builder.Services.AddSingleton<MarketDataCollectorBackgroundService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<MarketDataCollectorBackgroundService>());
+
 
 builder.Services.AddSignalR();
 
