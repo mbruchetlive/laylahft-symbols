@@ -21,7 +21,7 @@ public class MarketDataCollectorBackgroundService : BackgroundService
     private readonly IBinanceSocketClient _socketClient;
     private readonly ICandleBufferRegistry _bufferRegistry;
 
-    private static readonly Meter _meter = new("LaylaHft.MarketDataCollectorWorker", "1.0");
+    private static readonly Meter _meter = new("LaylaHft.MarketDataCollectorWorker");
     private static readonly Counter<int> _errorCounter = _meter.CreateCounter<int>("layla_ws_errors");
     private static readonly Counter<int> _klineMessageCounter = _meter.CreateCounter<int>("layla_ws_kline_messages");
     private static readonly Histogram<double> _latencyHistogram = _meter.CreateHistogram<double>("layla_ws_candle_latency", unit: "ms");
@@ -203,11 +203,17 @@ public class MarketDataCollectorBackgroundService : BackgroundService
         if (data?.Data == null)
             return;
 
-        var kline = data.Data;
-
         if (string.IsNullOrEmpty(data.Symbol))
         {
             _logger.LogWarning("Données de bougie invalide reçues - symbole non identifiable : {Data}", data);
+            return;
+        }
+
+        var kline = data.Data;
+
+        if (kline == null)
+        {
+            _logger.LogWarning("Données de bougie invalide reçues - kline est null : {Data}", data);
             return;
         }
 
@@ -216,6 +222,16 @@ public class MarketDataCollectorBackgroundService : BackgroundService
             _logger.LogDebug("Bougie invalide reçue prix ou volume invalide ou égale à 0 : {Kline}", kline);
             return;
         }
+
+        _klineMessageCounter.Add(1,
+            new("symbol", data.Symbol),
+            new("interval", kline.Interval.ToString()));
+
+        var latencyMs = (DateTime.UtcNow - kline.CloseTime).TotalMilliseconds;
+
+        _latencyHistogram.Record(latencyMs,
+            new KeyValuePair<string, object?>("symbol", data.Symbol),
+            new KeyValuePair<string, object?>("interval", kline.Interval.ToString()));
 
         var tf = ConvertFromKlineInterval(kline.Interval);
 

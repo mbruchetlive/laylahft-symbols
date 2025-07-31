@@ -18,7 +18,7 @@ public class CandleReceivedEventHandler(ICandleBufferRegistry bufferRegistry,
     private readonly MarketDetectionSettings _settings = settings.Value;
     private readonly IHubContext<SymbolHub> _hub = hub;
 
-    private static readonly Meter _meter = new("LaylaHft.CandleDetection", "1.0");
+    private static readonly Meter _meter = new("LaylaHft.CandleDetection");
     private static readonly Counter<int> _eventDetectedCounter = _meter.CreateCounter<int>("layla_marketdata_change_detected");
 
     // .NET Metrics (System.Diagnostics.Metrics) ne supporte pas decimal. Conversion explicite nécessaire.
@@ -26,6 +26,11 @@ public class CandleReceivedEventHandler(ICandleBufferRegistry bufferRegistry,
     private static readonly Histogram<double> _ratioCloseHistogram = _meter.CreateHistogram<double>("layla_ratio_close", unit: "ratio");
     private static readonly Histogram<double> _ratioVolatilityHistogram = _meter.CreateHistogram<double>("layla_ratio_volatility", unit: "ratio");
     private static readonly Histogram<int> _validCandlesHistogram = _meter.CreateHistogram<int>("layla_buffer_valid_candles", unit: "count", description: "Nombre de bougies valides dans le buffer");
+    private static readonly Histogram<int> _eventsPerHourHistogram = _meter.CreateHistogram<int>("layla_events_per_hour", unit: "count", description: "Nombre d'événements détectés par heure");
+    private static readonly Gauge<int> _currentHourEventGauge = _meter.CreateGauge<int>("layla_events_current_hour", description: "Nombre d'événements détectés sur l'heure courante");
+
+    private static readonly Dictionary<string, int> _eventsCurrentHourPerTF = new();
+    private static DateTime _lastResetHour = DateTime.UtcNow;
 
     private static readonly ActivitySource ActivitySource = new("LaylaHft.CandleDetection");
 
@@ -101,6 +106,37 @@ public class CandleReceivedEventHandler(ICandleBufferRegistry bufferRegistry,
                 snapshot.Symbol, snapshot.Interval, snapshot.CloseTime, string.Join(", ", changeTypes));
 
             _eventDetectedCounter.Add(1);
+
+            // Dans HandleAsync, juste après `_eventDetectedCounter.Add(1);`
+            string tfKey = snapshot.Interval.ToString().ToUpperInvariant();
+
+            // Incrémente compteur en mémoire
+            if (!_eventsCurrentHourPerTF.ContainsKey(tfKey))
+                _eventsCurrentHourPerTF[tfKey] = 0;
+            _eventsCurrentHourPerTF[tfKey]++;
+
+            // Met à jour Gauge Prometheus
+            _currentHourEventGauge.Record(_eventsCurrentHourPerTF[tfKey],
+                new KeyValuePair<string, object?>("interval", tfKey));
+
+            // Vérifie si on a changé d'heure → reset + push histogram
+            if (DateTime.UtcNow.Hour != _lastResetHour.Hour)
+            {
+                foreach (var kvp in _eventsCurrentHourPerTF)
+                {
+                    _eventsPerHourHistogram.Record(kvp.Value,
+                        new KeyValuePair<string, object?>("interval", kvp.Key));
+
+                    // 🔍 Détection plage cible pour M1
+                    if (kvp.Key == "M1" && (kvp.Value < 50 || kvp.Value > 150))
+                    {
+                        logger.LogWarning("⚠️ M1 hors plage : {Count} événements/h (Cible : 50–150)", kvp.Value);
+                    }
+                }
+
+                _eventsCurrentHourPerTF.Clear();
+                _lastResetHour = DateTime.UtcNow;
+            }
 
             var evt = new MarketDataChange
             {

@@ -1,4 +1,6 @@
 ﻿using LaylaHft.Platform.MarketData.Services;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 
 namespace LaylaHft.Platform.MarketData.BackgroundServices;
 
@@ -9,6 +11,12 @@ public class SymbolStatsProcessorService : BackgroundService
     private readonly ISymbolStatsQueue _queue;
     private readonly IServiceProvider _sp;
     private readonly ILogger<SymbolStatsProcessorService> _logger;
+
+    private static readonly Meter _meter = new("LaylaHft.SymbolStatsProcessor", "1.0");
+
+    private static readonly Counter<int> _processedCounter = _meter.CreateCounter<int>("layla_stats_processed");
+    private static readonly Counter<int> _errorCounter = _meter.CreateCounter<int>("layla_stats_errors");
+    private static readonly Histogram<double> _processingDuration = _meter.CreateHistogram<double>("layla_stats_processing_duration", unit: "ms");
 
     public SymbolStatsProcessorService(ISymbolStatsQueue queue, IServiceProvider sp, ILogger<SymbolStatsProcessorService> logger)
     {
@@ -36,6 +44,7 @@ public class SymbolStatsProcessorService : BackgroundService
     {
         while (!ct.IsCancellationRequested)
         {
+            var sw = Stopwatch.StartNew();
             try
             {
                 var symbol = await _queue.DequeueAsync(ct);
@@ -53,16 +62,29 @@ public class SymbolStatsProcessorService : BackgroundService
                 await calculator.CalculateAsync(symbol);
                 await store.Upsert(symbol.Exchange, symbol.QuoteAsset, symbol.Symbol, symbol);
 
+                _processedCounter.Add(1,
+                    new KeyValuePair<string, object?>("worker", workerId),
+                    new KeyValuePair<string, object?>("symbol", symbol.Symbol));
+
                 _logger.LogInformation("✅ [Worker {Worker}] Stats calculated for {Symbol}/{Exchange}", workerId, symbol.Symbol, symbol.Exchange);
 
                 _queue.MarkProcessed();
-
-                await Task.Delay(200, ct); // Throttle processing
             }
             catch (Exception ex)
             {
+                _errorCounter.Add(1,
+                    new KeyValuePair<string, object?>("worker", workerId));
+
                 _logger.LogError(ex, "❌ [Worker {Worker}] Error processing market stats", workerId);
             }
+            finally
+            {
+                sw.Stop();
+                _processingDuration.Record(sw.Elapsed.TotalMilliseconds,
+                    new KeyValuePair<string, object?>("worker", workerId));
+            }
+
+            await Task.Delay(200, ct); // Throttle processing
         }
     }
 }

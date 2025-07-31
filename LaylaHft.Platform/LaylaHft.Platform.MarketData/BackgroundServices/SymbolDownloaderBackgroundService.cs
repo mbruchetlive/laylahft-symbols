@@ -16,7 +16,7 @@ public class SymbolDownloaderBackgroundService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly PeriodicTimer _timer = new(TimeSpan.FromHours(12));
 
-    private static readonly Meter _meter = new("LaylaHft.SymbolDownloader", "1.0");
+    private static readonly Meter _meter = new("LaylaHft.SymbolDownloader");
     private static readonly Counter<int> _symbolDownloadCounter = _meter.CreateCounter<int>("layla_symbols_downloaded");
     private static readonly Counter<int> _symbolDownloadErrors = _meter.CreateCounter<int>("layla_symbol_download_errors");
     private static readonly Histogram<double> _symbolDownloadDuration = _meter.CreateHistogram<double>("layla_symbol_download_duration", unit: "ms");

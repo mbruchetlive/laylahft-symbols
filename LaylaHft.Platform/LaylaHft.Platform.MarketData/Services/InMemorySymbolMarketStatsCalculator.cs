@@ -31,7 +31,7 @@ public class InMemorySymbolMarketStatsCalculator : ISymbolMarketStatsCalculator
         Activity.DefaultIdFormat = ActivityIdFormat.W3C;
         Activity.ForceDefaultIdFormat = true;
 
-        _meter = new Meter("LaylaHft.MarketStats", "1.0");
+        _meter = new Meter("LaylaHft.MarketStats");
         _activitySource = new ActivitySource("LaylaHft.MarketStats");
 
         _successCounter = _meter.CreateCounter<int>("stats.calculated.success.count", description: "Nombre de symboles calculés avec succès");
