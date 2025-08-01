@@ -4,6 +4,8 @@ using FastEndpoints.Swagger;
 using LaylaHft.Platform.MarketData;
 using LaylaHft.Platform.MarketData.BackgroundServices;
 using LaylaHft.Platform.MarketData.Services;
+using LaylaHft.Platform.MarketData.Services.Interfaces;
+using LaylaHft.Platform.ServiceDefaults;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("LaylaHft.Platform.Tests")]

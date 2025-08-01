@@ -1,4 +1,5 @@
 ﻿using LaylaHft.Platform.Domains;
+using LaylaHft.Platform.MarketData.Services.Interfaces;
 using MessagePack;
 using System.Collections.Concurrent;
 using System.Diagnostics;

@@ -3,6 +3,7 @@ using Binance.Net.Interfaces.Clients;
 using FastEndpoints;
 using LaylaHft.Platform.Domains;
 using LaylaHft.Platform.MarketData.Events;
+using LaylaHft.Platform.MarketData.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;

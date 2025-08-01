@@ -1,6 +1,6 @@
 ﻿using LaylaHft.Platform.Domains;
 
-namespace LaylaHft.Platform.MarketData.Services;
+namespace LaylaHft.Platform.MarketData.Services.Interfaces;
 
 public interface ISymbolMarketStatsCalculator
 {

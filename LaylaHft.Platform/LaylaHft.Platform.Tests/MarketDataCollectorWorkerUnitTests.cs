@@ -8,7 +8,7 @@ using CryptoExchange.Net.Objects;
 using CryptoExchange.Net.Objects.Sockets;
 using LaylaHft.Platform.Domains;
 using LaylaHft.Platform.MarketData.BackgroundServices;
-using LaylaHft.Platform.MarketData.Services;
+using LaylaHft.Platform.MarketData.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;

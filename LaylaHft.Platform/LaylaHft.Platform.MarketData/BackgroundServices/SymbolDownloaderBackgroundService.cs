@@ -3,6 +3,7 @@
 // SymbolBackgroundService.cs
 
 using LaylaHft.Platform.MarketData.Services;
+using LaylaHft.Platform.MarketData.Services.Interfaces;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;

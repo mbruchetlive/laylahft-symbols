@@ -2,7 +2,7 @@
 using LaylaHft.Platform.Domains;
 using System.Collections.Concurrent;
 
-namespace LaylaHft.Platform.MarketData.Services
+namespace LaylaHft.Platform.MarketData.Services.Interfaces
 {
     public interface IKlineCacheStore
     {

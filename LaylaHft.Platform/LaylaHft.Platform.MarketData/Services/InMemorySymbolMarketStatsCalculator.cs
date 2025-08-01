@@ -2,6 +2,7 @@
 using Binance.Net.Interfaces;
 using Binance.Net.Interfaces.Clients;
 using LaylaHft.Platform.Domains;
+using LaylaHft.Platform.MarketData.Services.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using System.Diagnostics;

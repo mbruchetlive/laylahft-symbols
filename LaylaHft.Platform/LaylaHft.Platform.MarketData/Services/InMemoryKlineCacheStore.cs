@@ -1,5 +1,6 @@
 ﻿using Binance.Net.Interfaces;
 using LaylaHft.Platform.Domains;
+using LaylaHft.Platform.MarketData.Services.Interfaces;
 using System.Collections.Concurrent;
 
 namespace LaylaHft.Platform.MarketData.Services;

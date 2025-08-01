@@ -1,4 +1,4 @@
-﻿namespace LaylaHft.Platform.MarketData.Services;
+﻿namespace LaylaHft.Platform.MarketData.Services.Interfaces;
 
 public class CircularBuffer<T>
 {
